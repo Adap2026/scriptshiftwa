@@ -39,14 +39,7 @@ const SHIFT_PRICES = {
 };
 
 // ── Mock shifts ────────────────────────────────────────────────────────────────
-const MOCK = [
-  { id:"s1", pharmacy_name:"Karratha Day & Night Pharmacy", location:"Karratha, Pilbara",   region:"Regional", shift_date:"Today",       start_time:"14:00", end_time:"22:00", rate:85, type:"Emergency", software:"Fred Dispense", scripts_min:120, scripts_max:150, travel_paid:true,  accommodation:true,  applicant_count:2,  posted:"22 min ago" },
-  { id:"s2", pharmacy_name:"Cottesloe Pharmacy",            location:"Cottesloe, Perth Metro",region:"Metro",    shift_date:"Tomorrow",    start_time:"09:00", end_time:"17:00", rate:65, type:"Standard",  software:"Minfos",        scripts_min:80,  scripts_max:100, travel_paid:false, accommodation:false, applicant_count:5,  posted:"1 hr ago" },
-  { id:"s3", pharmacy_name:"Broome Central Chemist",        location:"Broome, Kimberley",    region:"Regional", shift_date:"Sat 31 May",  start_time:"08:00", end_time:"18:00", rate:95, type:"Weekend",   software:"Fred Dispense", scripts_min:100, scripts_max:130, travel_paid:true,  accommodation:true,  applicant_count:1,  posted:"3 hrs ago" },
-  { id:"s4", pharmacy_name:"Subiaco Wellness Pharmacy",     location:"Subiaco, Perth Metro", region:"Metro",    shift_date:"Mon 26 May",  start_time:"13:00", end_time:"21:00", rate:68, type:"Evening",   software:"Minfos",        scripts_min:60,  scripts_max:80,  travel_paid:false, accommodation:false, applicant_count:8,  posted:"5 hrs ago" },
-  { id:"s5", pharmacy_name:"Kalgoorlie SuperPharmacy",      location:"Kalgoorlie, Goldfields",region:"Regional", shift_date:"Sun 1 Jun",  start_time:"09:00", end_time:"17:00", rate:90, type:"Weekend",   software:"LOTS",          scripts_min:90,  scripts_max:120, travel_paid:true,  accommodation:false, applicant_count:0,  posted:"7 hrs ago" },
-  { id:"s6", pharmacy_name:"Fremantle Health Hub",          location:"Fremantle, Perth Metro",region:"Metro",    shift_date:"Tue 27 May", start_time:"09:00", end_time:"17:00", rate:62, type:"Standard",  software:"Fred Dispense", scripts_min:70,  scripts_max:90,  travel_paid:false, accommodation:false, applicant_count:11, posted:"12 hrs ago" },
-];
+const MOCK = [];
 
 const fmt12 = (t) => { const [h,m]=t.split(":"); const hr=+h; return `${hr>12?hr-12:hr||12}:${m}${hr>=12?"pm":"am"}`; };
 
@@ -305,7 +298,7 @@ export default function ScriptShiftWA() {
   const [applied, setApplied]     = useState(new Set());
   const [applyTarget, setTarget]  = useState(null);
   const [toast, setToast]         = useState("");
-  const [liveCount, setLive]      = useState(MOCK.length);
+  const [liveCount, setLive]      = useState(0);
   const [pulse, setPulse]         = useState(false);
 
   // Check if returning from successful Stripe payment
@@ -416,7 +409,16 @@ export default function ScriptShiftWA() {
           </div>
 
           <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:14 }}>
-            {filtered.map((s,i)=>(
+            {filtered.length === 0 ? (
+              <div style={{ gridColumn:"1/-1", textAlign:"center", padding:"60px 20px", color:T.dim }}>
+                <div style={{ fontSize:48, marginBottom:16, opacity:0.4 }}>💊</div>
+                <div style={{ fontFamily:"'Playfair Display',serif", fontSize:22, color:T.white, marginBottom:8 }}>No shifts posted yet</div>
+                <div style={{ fontSize:14, lineHeight:1.7, maxWidth:380, margin:"0 auto", marginBottom:24 }}>ScriptShift WA is open for business. Be the first pharmacy owner to post a shift and connect with verified WA pharmacists.</div>
+                <button onClick={()=>setView("post")} style={{ background:T.amber, color:"#000", border:"none", borderRadius:9, padding:"12px 28px", fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"'Outfit',sans-serif" }}>
+                  Post the First Shift →
+                </button>
+              </div>
+            ) : filtered.map((s,i)=>(
               <ShiftCard key={s.id} shift={s} applied={applied.has(s.id)} onApply={setTarget} animDelay={i*0.06} />
             ))}
           </div>
