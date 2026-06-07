@@ -644,6 +644,90 @@ function ProfileView({ user, token, onSignOut }) {
   );
 }
 
+// ── LEGAL MODAL ───────────────────────────────────────────────────────────────
+const LEGAL_CONTENT = {
+  terms: {
+    title: "Terms of Service",
+    updated: "Effective 7 June 2026 — ScriptShift Technologies Pty Ltd (ABN 21 698 500 542)",
+    sections: [
+      { h: "1. About ScriptShift WA", p: "ScriptShift WA is an online marketplace operated by ScriptShift Technologies Pty Ltd (ABN 21 698 500 542) that connects pharmacy owners with locum pharmacists in Western Australia. By using our platform at scriptshiftwa.com.au, you agree to these Terms of Service." },
+      { h: "2. Who Can Use ScriptShift WA", p: "Pharmacy owners must be the owner, manager or authorised representative of a pharmacy operating in Western Australia and hold all necessary licences under the Pharmacy Act 2010 (WA). Pharmacists must be currently registered with AHPRA with an active, unconditional registration. You are responsible for maintaining the confidentiality of your account credentials." },
+      { h: "3. Shift Posting Fees", p: "Posting fees: Standard $14 AUD · Evening $14 AUD · Weekend $19 AUD · Emergency $24 AUD · 3-Day Bundle $35 AUD · 5-Day Bundle $55 AUD · 8-Day Bundle $80 AUD (all GST inclusive). Fees are non-refundable once a shift is published. We reserve the right to update fees with 7 days' notice." },
+      { h: "4. AHPRA Verification", p: "Pharmacists must provide their valid AHPRA registration number during sign-up. By providing this number, you confirm your registration is current and unconditional. ScriptShift WA displays your AHPRA number to pharmacy owners for verification purposes. It is the pharmacy owner's responsibility to confirm registration status before engaging a pharmacist." },
+      { h: "5. The Relationship Between Users", p: "ScriptShift WA is a marketplace platform only. We are not a party to any employment or contractor agreement between pharmacy owners and pharmacists. We are not responsible for the conduct of any user, accuracy of shift details, disputes arising from engagements, or payment of wages. Users are solely responsible for ensuring compliance with all applicable laws including the Pharmacy Industry Award 2020." },
+      { h: "6. Prohibited Conduct", p: "Users must not: provide false information including false AHPRA numbers; post shifts for pharmacies they are not authorised to represent; use the platform unlawfully; circumvent our payment system; or harass other users. Breach may result in immediate account suspension." },
+      { h: "7. Limitation of Liability", p: "To the maximum extent permitted by Australian law, ScriptShift Technologies Pty Ltd is not liable for any indirect, incidental, special or consequential loss arising from your use of the platform. Our total liability is limited to the amount you paid us in the 3 months preceding any claim." },
+      { h: "8. Governing Law", p: "These Terms are governed by the laws of Western Australia and the Commonwealth of Australia. Any disputes will be subject to the exclusive jurisdiction of the courts of Western Australia." },
+      { h: "9. Contact", p: "hello@scriptshiftwa.com.au — ScriptShift Technologies Pty Ltd, Perth WA" },
+    ]
+  },
+  privacy: {
+    title: "Privacy Policy",
+    updated: "Effective 7 June 2026 — ScriptShift Technologies Pty Ltd (ABN 21 698 500 542)",
+    sections: [
+      { h: "1. Our Commitment", p: "ScriptShift Technologies Pty Ltd is committed to protecting your personal information in accordance with the Australian Privacy Act 1988 (Cth) and the Australian Privacy Principles (APPs)." },
+      { h: "2. Information We Collect", p: "Pharmacists: full name, email, phone, AHPRA registration number, dispensing software skills, preferred regions, minimum rate. Pharmacy owners: pharmacy name, location, shift details, payment info (processed by Stripe — we do not store card details). We may also collect browser type and IP address." },
+      { h: "3. How We Use Your Information", p: "To create and manage your account; display your AHPRA number to pharmacy owners for verification; match pharmacists with shifts; process payments via Stripe; send shift match notifications; and comply with legal obligations." },
+      { h: "4. Disclosure", p: "We share your information only with: pharmacy owners (name, AHPRA, skills, regions when you apply); Stripe (payment processing); and government authorities if required by law. We do not sell your personal information." },
+      { h: "5. AHPRA Number", p: "Your AHPRA number is stored securely and displayed only to pharmacy owners on our platform for verification purposes. It is not publicly searchable." },
+      { h: "6. Data Storage & Security", p: "Your data is stored securely using Supabase (servers in Sydney, Australia). We use HTTPS encryption and access controls. No internet transmission is completely secure." },
+      { h: "7. Your Rights", p: "Under the Australian Privacy Act you have the right to access, correct, or request deletion of your personal information. Contact us at hello@scriptshiftwa.com.au. We respond within 30 days." },
+      { h: "8. Complaints", p: "You may lodge a complaint with the Office of the Australian Information Commissioner (OAIC) at www.oaic.gov.au." },
+      { h: "9. Contact", p: "Privacy Officer — hello@scriptshiftwa.com.au" },
+    ]
+  },
+  refund: {
+    title: "Refund Policy",
+    updated: "Effective 7 June 2026 — ScriptShift Technologies Pty Ltd (ABN 21 698 500 542)",
+    sections: [
+      { h: "1. Posting Fees", p: "Shift posting fees are non-refundable once a shift is published and visible to pharmacists." },
+      { h: "2. When We May Issue a Refund", p: "We will consider refunds for: (a) Technical errors where your shift was not published despite successful payment — we will publish the shift or refund in full; (b) Duplicate charges due to a system error — refunded within 5 business days; (c) Platform unavailability for more than 24 consecutive hours — we will offer a credit towards a future posting." },
+      { h: "3. How to Request a Refund", p: "Email hello@scriptshiftwa.com.au within 7 days of payment with your registered email, payment date, pharmacy name, shift date and reason. We respond within 3 business days." },
+      { h: "4. Cancellations & No-Shows", p: "If a pharmacy owner cancels after a pharmacist is engaged, the posting fee is not refundable. If a pharmacist no-shows, the posting fee is not refundable. These matters are between the pharmacy owner and pharmacist." },
+      { h: "5. Consumer Guarantees", p: "Nothing in this policy excludes, restricts or modifies any consumer guarantee, right or remedy under the Australian Consumer Law." },
+      { h: "6. Payment Processing", p: "Approved refunds are credited to your original payment method within 5–10 business days depending on your bank. All payments are processed by Stripe." },
+      { h: "7. Contact", p: "hello@scriptshiftwa.com.au — ScriptShift Technologies Pty Ltd" },
+    ]
+  }
+};
+
+function LegalModal({ doc, onClose }) {
+  const content = LEGAL_CONTENT[doc];
+  if (!content) return null;
+  return (
+    <div style={{ position:"fixed",inset:0,background:"rgba(5,6,10,0.92)",backdropFilter:"blur(8px)",zIndex:350,display:"flex",alignItems:"center",justifyContent:"center",padding:20 }} onClick={onClose}>
+      <div style={{ background:T.bgCard,border:`1px solid ${T.borderHi}`,borderRadius:20,maxWidth:640,width:"100%",maxHeight:"85vh",display:"flex",flexDirection:"column",boxShadow:"0 32px 80px rgba(0,0,0,0.7)",animation:"fadeUp 0.25s ease" }} onClick={e=>e.stopPropagation()}>
+        {/* Header */}
+        <div style={{ padding:"24px 28px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexShrink:0 }}>
+          <div>
+            <div style={{ fontFamily:"'Playfair Display',serif",fontSize:22,color:T.white,marginBottom:4 }}>{content.title}</div>
+            <div style={{ fontSize:11,color:T.dimmer,lineHeight:1.5 }}>{content.updated}</div>
+          </div>
+          <button onClick={onClose} style={{ background:"none",border:"none",color:T.dim,cursor:"pointer",fontSize:20,padding:"0 0 0 16px",flexShrink:0 }}>✕</button>
+        </div>
+        {/* Scrollable content */}
+        <div style={{ padding:"20px 28px",overflowY:"auto",flex:1 }}>
+          {content.sections.map((s,i)=>(
+            <div key={i} style={{ marginBottom:20 }}>
+              <div style={{ fontSize:13,fontWeight:700,color:T.amber,marginBottom:6,letterSpacing:0.3 }}>{s.h}</div>
+              <div style={{ fontSize:13,color:T.dim,lineHeight:1.7 }}>{s.p}</div>
+            </div>
+          ))}
+          <div style={{ paddingTop:16,borderTop:`1px solid ${T.border}`,fontSize:11,color:T.dimmer,lineHeight:1.6 }}>
+            For the full version of this document, contact hello@scriptshiftwa.com.au · ScriptShift Technologies Pty Ltd ABN 21 698 500 542
+          </div>
+        </div>
+        {/* Footer */}
+        <div style={{ padding:"16px 28px",borderTop:`1px solid ${T.border}`,flexShrink:0 }}>
+          <button onClick={onClose} style={{ width:"100%",padding:"11px 0",borderRadius:9,border:"none",background:T.amber,color:"#000",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function ScriptShiftWA() {
   const [view, setView]         = useState("browse");
@@ -659,6 +743,7 @@ export default function ScriptShiftWA() {
   const [token, setToken]       = useState(null);
   const [shifts]                = useState([]);
   const [confirmedEmail, setConfirmedEmail] = useState(false);
+  const [legalDoc, setLegalDoc] = useState(null);
 
   // Restore session on load
   useEffect(()=>{
@@ -844,12 +929,71 @@ export default function ScriptShiftWA() {
 
       {showAuth && <AuthModal onClose={()=>setShowAuth(false)} onSuccess={handleAuthSuccess} />}
       {applyTarget && <ApplyModal shift={applyTarget} onClose={()=>setTarget(null)} onConfirm={confirmApply} />}
+      {legalDoc && <LegalModal doc={legalDoc} onClose={()=>setLegalDoc(null)} />}
 
       {toast && (
         <div style={{ position:"fixed",bottom:28,left:"50%",transform:"translateX(-50%)",background:T.bgCard,border:`1px solid ${T.mint}`,borderRadius:10,padding:"12px 22px",fontSize:13,fontWeight:600,color:T.mintText,zIndex:400,boxShadow:`0 8px 32px rgba(0,0,0,0.4)`,whiteSpace:"nowrap",animation:"slideIn 0.3s ease" }}>
           ✓ {toast}
         </div>
       )}
+
+      {/* Footer */}
+      <footer style={{ background:T.bgCard,borderTop:`1px solid ${T.border}`,padding:"32px 28px",marginTop:40 }}>
+        <div style={{ maxWidth:980,margin:"0 auto" }}>
+          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:24,marginBottom:24 }}>
+            <div>
+              <div style={{ fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:900,color:T.white,marginBottom:6 }}>
+                Script<span style={{color:T.amber}}>Shift</span> <span style={{fontSize:13,fontWeight:400,color:T.dim}}>Western Australia</span>
+              </div>
+              <div style={{ fontSize:12,color:T.dimmer,lineHeight:1.7 }}>
+                Real-time pharmacy shift marketplace<br/>
+                ScriptShift Technologies Pty Ltd<br/>
+                ABN 21 698 500 542
+              </div>
+            </div>
+            <div style={{ display:"flex",gap:40,flexWrap:"wrap" }}>
+              <div>
+                <div style={{ fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:1,textTransform:"uppercase",marginBottom:10 }}>Platform</div>
+                {[["Browse Shifts","browse"],["Post a Shift","post"],["Sign In / Register","auth"]].map(([l,k])=>(
+                  <div key={k} style={{ marginBottom:8 }}>
+                    <span onClick={()=>k==="auth"?setShowAuth(true):setView(k)}
+                      style={{ fontSize:13,color:T.dim,cursor:"pointer",transition:"color 0.15s" }}
+                      onMouseEnter={e=>e.target.style.color=T.amber}
+                      onMouseLeave={e=>e.target.style.color=T.dim}>{l}</span>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div style={{ fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:1,textTransform:"uppercase",marginBottom:10 }}>Legal</div>
+                {[["Terms of Service","terms"],["Privacy Policy","privacy"],["Refund Policy","refund"]].map(([l,k])=>(
+                  <div key={k} style={{ marginBottom:8 }}>
+                    <span onClick={()=>setLegalDoc(k)}
+                      style={{ fontSize:13,color:T.dim,cursor:"pointer",transition:"color 0.15s" }}
+                      onMouseEnter={e=>e.target.style.color=T.amber}
+                      onMouseLeave={e=>e.target.style.color=T.dim}>{l}</span>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div style={{ fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:1,textTransform:"uppercase",marginBottom:10 }}>Contact</div>
+                <div style={{ fontSize:13,color:T.dim,marginBottom:8 }}>hello@scriptshiftwa.com.au</div>
+                <div style={{ fontSize:13,color:T.dim,marginBottom:8 }}>scriptshiftwa.com.au</div>
+                <div style={{ fontSize:13,color:T.dim }}>Perth, Western Australia</div>
+              </div>
+            </div>
+          </div>
+          <div style={{ borderTop:`1px solid ${T.border}`,paddingTop:16,display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:10 }}>
+            <div style={{ fontSize:11,color:T.dimmer }}>
+              © 2026 ScriptShift Technologies Pty Ltd. All rights reserved.
+            </div>
+            <div style={{ fontSize:11,color:T.dimmer,display:"flex",gap:16 }}>
+              {[["Terms","terms"],["Privacy","privacy"],["Refunds","refund"]].map(([l,k])=>(
+                <span key={k} onClick={()=>setLegalDoc(k)} style={{ cursor:"pointer",textDecoration:"underline" }}>{l}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
