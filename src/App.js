@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import { useState, useEffect } from "react";
 
 // ── Fonts ─────────────────────────────────────────────────────────────────────
@@ -77,13 +78,6 @@ const supaSignOut = async (token) => {
     method:"POST",
     headers: supaHeaders(token),
   });
-};
-
-
-  const res = await fetch(`${SUPA_URL}/auth/v1/user`, {
-    headers: supaHeaders(token),
-  });
-  return res.json();
 };
 
 const supaUpdateProfile = async (token, userId, updates) => {
@@ -539,12 +533,12 @@ export default function ScriptShiftWA() {
   const [applied, setApplied]   = useState(new Set());
   const [applyTarget, setTarget]= useState(null);
   const [toast, setToast]       = useState("");
-  const [liveCount]    = useState(0);
+  const [liveCount] = useState(0);
   const [pulse, setPulse]       = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [user, setUser]         = useState(null);
   const [token, setToken]       = useState(null);
-  const [shifts]     = useState([]);
+  const [shifts]                = useState([]);
   const [confirmedEmail, setConfirmedEmail] = useState(false);
 
   // Restore session on load
