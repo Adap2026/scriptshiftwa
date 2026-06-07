@@ -957,9 +957,7 @@ export default function ScriptShiftWA() {
                 {[["Browse Shifts","browse"],["Post a Shift","post"],["Sign In / Register","auth"]].map(([l,k])=>(
                   <div key={k} style={{ marginBottom:8 }}>
                     <span onClick={()=>k==="auth"?setShowAuth(true):setView(k)}
-                      style={{ fontSize:13,color:T.dim,cursor:"pointer",transition:"color 0.15s" }}
-                      onMouseEnter={e=>e.target.style.color=T.amber}
-                      onMouseLeave={e=>e.target.style.color=T.dim}>{l}</span>
+                      style={{ fontSize:13,color:T.dim,cursor:"pointer" }}>{l}</span>
                   </div>
                 ))}
               </div>
@@ -968,9 +966,7 @@ export default function ScriptShiftWA() {
                 {[["Terms of Service","terms"],["Privacy Policy","privacy"],["Refund Policy","refund"]].map(([l,k])=>(
                   <div key={k} style={{ marginBottom:8 }}>
                     <span onClick={()=>setLegalDoc(k)}
-                      style={{ fontSize:13,color:T.dim,cursor:"pointer",transition:"color 0.15s" }}
-                      onMouseEnter={e=>e.target.style.color=T.amber}
-                      onMouseLeave={e=>e.target.style.color=T.dim}>{l}</span>
+                      style={{ fontSize:13,color:T.dim,cursor:"pointer" }}>{l}</span>
                   </div>
                 ))}
               </div>
