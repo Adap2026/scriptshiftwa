@@ -371,9 +371,9 @@ function ApplyModal({ shift, onClose, onConfirm }) {
 // Multi-day Stripe Payment Links (create these in Stripe dashboard)
 const BUNDLE_LINKS = {
   1: null, // uses STRIPE_PAYMENT_LINKS per type
-  3: "https://https://buy.stripe.com/00wdR29Vbg8KeSGeNla7C04
-  5: "https://https://buy.stripe.com/fZu14g4ARg8KaCq0Wva7C05
-  8: "https://https://buy.stripe.com/7sY7sEc3j3lY11QdJha7C06
+  3: "https://buy.stripe.com/YOUR_3DAY_BUNDLE_LINK",   // ~$35 AUD
+  5: "https://buy.stripe.com/YOUR_5DAY_BUNDLE_LINK",   // ~$55 AUD
+  8: "https://buy.stripe.com/YOUR_8DAY_BUNDLE_LINK",   // ~$80 AUD
 };
 
 const getDayCount = (start, end) => {
