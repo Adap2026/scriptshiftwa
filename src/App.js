@@ -368,22 +368,83 @@ function ApplyModal({ shift, onClose, onConfirm }) {
 }
 
 // ── POST SHIFT ────────────────────────────────────────────────────────────────
+// Multi-day Stripe Payment Links (create these in Stripe dashboard)
+const BUNDLE_LINKS = {
+  1: null, // uses STRIPE_PAYMENT_LINKS per type
+  3: "https://buy.stripe.com/YOUR_3DAY_BUNDLE_LINK",   // ~$35 AUD
+  5: "https://buy.stripe.com/YOUR_5DAY_BUNDLE_LINK",   // ~$55 AUD
+  8: "https://buy.stripe.com/YOUR_8DAY_BUNDLE_LINK",   // ~$80 AUD
+};
+
+const getDayCount = (start, end) => {
+  if (!start || !end) return 0;
+  const s = new Date(start), e = new Date(end);
+  if (e < s) return 0;
+  return Math.round((e - s) / (1000*60*60*24)) + 1;
+};
+
+const getBundlePrice = (days, type) => {
+  const base = { Standard:14, Evening:14, Weekend:19, Emergency:24 }[type] || 14;
+  if (days <= 1) return `$${base} AUD`;
+  if (days <= 3) return `$${Math.min(days*base, 35)} AUD`;
+  if (days <= 5) return `$${Math.min(days*base, 55)} AUD`;
+  return `$${Math.min(days*base, 80)} AUD`;
+};
+
+const getSaving = (days, type) => {
+  const base = { Standard:14, Evening:14, Weekend:19, Emergency:24 }[type] || 14;
+  if (days <= 1) return 0;
+  const full = days * base;
+  const discounted = days<=3?Math.min(full,35):days<=5?Math.min(full,55):Math.min(full,80);
+  return full - discounted;
+};
+
 function PostView() {
-  const [form, setForm] = useState({ pharmacy_name:"", location:"", region:"Metro", shift_date:"", start_time:"09:00", end_time:"17:00", rate:"", type:"Standard", software:"Fred Dispense", travel_paid:false, accommodation:false, notes:"" });
+  const [form, setForm] = useState({
+    pharmacy_name:"", location:"", region:"Metro",
+    date_from:"", date_to:"",
+    start_time:"09:00", end_time:"17:00", rate:"",
+    type:"Standard", software:"Fred Dispense",
+    travel_paid:false, accommodation:false, notes:""
+  });
   const [step, setStep] = useState("form");
   const [error, setError] = useState("");
 
   const set   = k => e => setForm(p=>({...p,[k]:e.target.value}));
   const check = k => e => setForm(p=>({...p,[k]:e.target.checked}));
 
+  const days    = getDayCount(form.date_from, form.date_to);
+  const price   = getBundlePrice(days, form.type);
+  const saving  = getSaving(days, form.type);
+
   const handleContinue = () => {
-    if (!form.pharmacy_name||!form.location||!form.shift_date||!form.rate) { setError("Please fill in all required fields."); return; }
+    if (!form.pharmacy_name||!form.location||!form.date_from||!form.rate) {
+      setError("Please fill in all required fields — Pharmacy Name, Location, Start Date and Rate."); return;
+    }
+    if (form.date_to && new Date(form.date_to) < new Date(form.date_from)) {
+      setError("End date cannot be before start date."); return;
+    }
     setError(""); setStep("pay");
   };
 
   const handlePay = () => {
-    const link = STRIPE_PAYMENT_LINKS[form.type];
-    const params = new URLSearchParams({ prefilled_email:"", client_reference_id:`${form.pharmacy_name}_${form.shift_date}`.replace(/\s+/g,"_") });
+    // Choose link based on number of days
+    let link;
+    if (days <= 1) {
+      link = STRIPE_PAYMENT_LINKS[form.type];
+    } else if (days <= 3 && BUNDLE_LINKS[3] && !BUNDLE_LINKS[3].includes("YOUR_")) {
+      link = BUNDLE_LINKS[3];
+    } else if (days <= 5 && BUNDLE_LINKS[5] && !BUNDLE_LINKS[5].includes("YOUR_")) {
+      link = BUNDLE_LINKS[5];
+    } else if (BUNDLE_LINKS[8] && !BUNDLE_LINKS[8].includes("YOUR_")) {
+      link = BUNDLE_LINKS[8];
+    } else {
+      // Fall back to single shift link until bundle links are set up
+      link = STRIPE_PAYMENT_LINKS[form.type];
+    }
+    const params = new URLSearchParams({
+      client_reference_id: `${form.pharmacy_name}_${form.date_from}${form.date_to?`_to_${form.date_to}`:""}`.replace(/\s+/g,"_")
+    });
     window.location.href = `${link}?${params}`;
   };
 
@@ -391,57 +452,115 @@ function PostView() {
   const labelStyle = { fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:0.8,textTransform:"uppercase",display:"block",marginBottom:6 };
 
   return (
-    <div style={{ maxWidth:580,animation:"fadeUp 0.3s ease" }}>
+    <div style={{ maxWidth:600,animation:"fadeUp 0.3s ease" }}>
       <div style={{ fontFamily:"'Playfair Display',serif",fontSize:28,color:T.white,marginBottom:6 }}>Post a Shift</div>
       <div style={{ fontSize:14,color:T.dim,marginBottom:28,lineHeight:1.6 }}>
-        Your shift goes live the moment payment is confirmed. Posting fee: <span style={{color:T.amberText}}>$14–$24 AUD</span> one-time, no commission ever.
+        Post a single shift or a multi-day block. Posting fee: <span style={{color:T.amberText}}>$14–$24 AUD</span> per shift, with bundle discounts for multiple days.
       </div>
+
+      {/* Bundle info cards */}
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:24 }}>
+        {[["1 day","From $14"],["3 days","From $35"],["5 days","From $55"],["8 days","From $80"]].map(([l,p])=>(
+          <div key={l} style={{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 8px",textAlign:"center" }}>
+            <div style={{ fontSize:13,fontWeight:700,color:T.white,marginBottom:2 }}>{l}</div>
+            <div style={{ fontSize:11,color:T.amber,fontWeight:600 }}>{p}</div>
+          </div>
+        ))}
+      </div>
+
       {step==="form" && (
         <div style={{ background:T.bgCard,borderRadius:14,padding:28,border:`1px solid ${T.border}` }}>
           {error && <div style={{ background:T.coralDim,border:`1px solid ${T.coral}`,borderRadius:8,padding:"10px 14px",fontSize:13,color:T.coral,marginBottom:18 }}>⚠ {error}</div>}
+
           <label style={labelStyle}>Pharmacy Name *</label>
           <input style={inputStyle} placeholder="e.g. Karratha Day & Night Pharmacy" value={form.pharmacy_name} onChange={set("pharmacy_name")} />
+
           <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14 }}>
             <div><label style={labelStyle}>Location *</label><input style={inputStyle} placeholder="Suburb, City WA" value={form.location} onChange={set("location")} /></div>
             <div><label style={labelStyle}>Region</label><select style={inputStyle} value={form.region} onChange={set("region")}><option>Metro</option><option>Regional</option></select></div>
           </div>
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14 }}>
-            <div><label style={labelStyle}>Date *</label><input type="date" style={inputStyle} value={form.shift_date} onChange={set("shift_date")} /></div>
-            <div><label style={labelStyle}>Shift Type</label><select style={inputStyle} value={form.type} onChange={set("type")}>{["Standard","Emergency","Weekend","Evening"].map(t=><option key={t}>{t}</option>)}</select></div>
+
+          {/* Date range */}
+          <div style={{ background:T.bg,borderRadius:10,padding:16,marginBottom:18,border:`1px solid ${T.border}` }}>
+            <div style={{ fontSize:12,fontWeight:700,color:T.amber,marginBottom:12,letterSpacing:0.5 }}>📅 SHIFT DATE RANGE</div>
+            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14 }}>
+              <div>
+                <label style={labelStyle}>Start Date *</label>
+                <input type="date" style={{...inputStyle,marginBottom:0}} value={form.date_from} onChange={set("date_from")} />
+              </div>
+              <div>
+                <label style={labelStyle}>End Date <span style={{color:T.dimmer,fontWeight:400,textTransform:"none",letterSpacing:0}}>(optional)</span></label>
+                <input type="date" style={{...inputStyle,marginBottom:0}} value={form.date_to} onChange={set("date_to")} min={form.date_from} />
+              </div>
+            </div>
+            {days > 0 && (
+              <div style={{ marginTop:12,padding:"8px 12px",background:days>1?"rgba(240,165,0,0.08)":"transparent",borderRadius:8,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+                <span style={{ fontSize:13,color:T.dim }}>{days} shift{days>1?"s":""} selected</span>
+                <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+                  {saving>0 && <span style={{ fontSize:12,color:T.mint,fontWeight:600 }}>Save ${saving} AUD</span>}
+                  <span style={{ fontSize:15,fontWeight:700,color:T.amber }}>{price}</span>
+                </div>
+              </div>
+            )}
           </div>
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14 }}>
-            <div><label style={labelStyle}>Start</label><input type="time" style={inputStyle} value={form.start_time} onChange={set("start_time")} /></div>
-            <div><label style={labelStyle}>End</label><input type="time" style={inputStyle} value={form.end_time} onChange={set("end_time")} /></div>
+
+          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14 }}>
+            <div><label style={labelStyle}>Shift Type</label><select style={inputStyle} value={form.type} onChange={set("type")}>{["Standard","Emergency","Weekend","Evening"].map(t=><option key={t}>{t}</option>)}</select></div>
             <div><label style={labelStyle}>Rate ($/hr) *</label><input type="number" style={inputStyle} placeholder="85" value={form.rate} onChange={set("rate")} /></div>
           </div>
+
+          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14 }}>
+            <div><label style={labelStyle}>Start Time</label><input type="time" style={inputStyle} value={form.start_time} onChange={set("start_time")} /></div>
+            <div><label style={labelStyle}>End Time</label><input type="time" style={inputStyle} value={form.end_time} onChange={set("end_time")} /></div>
+          </div>
+
           <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14 }}>
             <div><label style={labelStyle}>Software</label><select style={inputStyle} value={form.software} onChange={set("software")}>{["Fred Dispense","Minfos","LOTS","Corum Health","Other"].map(s=><option key={s}>{s}</option>)}</select></div>
             <div><label style={labelStyle}>Perks</label><div style={{ display:"flex",gap:16,paddingTop:6 }}>{[["travel_paid","✈ Travel"],["accommodation","🏨 Stay"]].map(([k,l])=><label key={k} style={{ display:"flex",alignItems:"center",gap:7,fontSize:13,color:T.dim,cursor:"pointer" }}><input type="checkbox" checked={form[k]} onChange={check(k)} style={{accentColor:T.mint}} /> {l}</label>)}</div></div>
           </div>
+
           <label style={labelStyle}>Notes</label>
           <textarea style={{...inputStyle,minHeight:72,resize:"vertical"}} placeholder="Script volume, services, parking…" value={form.notes} onChange={set("notes")} />
+
           <button onClick={handleContinue} style={{ background:T.amber,color:"#000",border:"none",borderRadius:9,padding:"13px 32px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
-            Continue to Payment ({SHIFT_PRICES[form.type]}) →
+            Continue to Payment ({days>0?price:SHIFT_PRICES[form.type]}) →
           </button>
         </div>
       )}
+
       {step==="pay" && (
         <div style={{ background:T.bgCard,borderRadius:14,padding:28,border:`1px solid ${T.border}`,animation:"fadeUp 0.3s ease" }}>
           <div style={{ fontFamily:"'Playfair Display',serif",fontSize:22,color:T.white,marginBottom:6 }}>Almost live!</div>
-          <div style={{ fontSize:14,color:T.dim,marginBottom:24,lineHeight:1.6 }}>Click below to pay securely via Stripe. Your shift goes live the moment payment is confirmed.</div>
+          <div style={{ fontSize:14,color:T.dim,marginBottom:24,lineHeight:1.6 }}>Click below to pay securely via Stripe. Your shift{days>1?"s go":"goes"} live the moment payment is confirmed.</div>
           <div style={{ background:T.bg,borderRadius:10,padding:18,marginBottom:20,border:`1px solid ${T.border}` }}>
-            {[["Pharmacy",form.pharmacy_name],["Location",form.location],["Date",form.shift_date],["Hours",`${fmt12(form.start_time)} – ${fmt12(form.end_time)}`],["Rate",`$${form.rate}/hr`],["Type",form.type],["Software",form.software]].map(([l,v])=>(
+            {[
+              ["Pharmacy", form.pharmacy_name],
+              ["Location", form.location],
+              ["Dates", days>1?`${form.date_from} → ${form.date_to} (${days} days)`:form.date_from],
+              ["Hours", `${fmt12(form.start_time)} – ${fmt12(form.end_time)}`],
+              ["Rate", `$${form.rate}/hr`],
+              ["Type", form.type],
+              ["Software", form.software],
+            ].map(([l,v])=>(
               <div key={l} style={{ display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:8,color:T.dim }}><span>{l}</span><span style={{color:T.white,fontWeight:500}}>{v}</span></div>
             ))}
           </div>
-          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(240,165,0,0.06)",border:`1px solid rgba(240,165,0,0.2)`,borderRadius:10,padding:"16px 20px",marginBottom:20 }}>
-            <div><div style={{ fontSize:13,color:T.dim,marginBottom:3 }}>{form.type} shift posting fee</div><div style={{ fontSize:12,color:T.dimmer }}>One-time · No commission · No subscription</div></div>
-            <div style={{ fontFamily:"'Playfair Display',serif",fontSize:28,color:T.white }}>{SHIFT_PRICES[form.type]}</div>
+          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(240,165,0,0.06)",border:`1px solid rgba(240,165,0,0.2)`,borderRadius:10,padding:"16px 20px",marginBottom:12 }}>
+            <div>
+              <div style={{ fontSize:13,color:T.dim,marginBottom:3 }}>{days>1?`${days}-day block posting fee`:`${form.type} shift posting fee`}</div>
+              <div style={{ fontSize:12,color:T.dimmer }}>One-time · No commission · No subscription</div>
+            </div>
+            <div style={{ fontFamily:"'Playfair Display',serif",fontSize:28,color:T.white }}>{price}</div>
           </div>
+          {saving>0 && (
+            <div style={{ background:"rgba(0,229,176,0.06)",border:`1px solid rgba(0,229,176,0.2)`,borderRadius:8,padding:"8px 16px",marginBottom:12,fontSize:13,color:T.mintText,fontWeight:600 }}>
+              🎉 Bundle discount applied — you're saving ${saving} AUD!
+            </div>
+          )}
           <div style={{ fontSize:12,color:T.dimmer,marginBottom:20 }}>🔒 Redirects to Stripe secure checkout · Australian GST applies</div>
           <div style={{ display:"flex",gap:10 }}>
             <button onClick={()=>setStep("form")} style={{ flex:1,padding:"12px 0",borderRadius:8,border:`1px solid ${T.border}`,background:"transparent",color:T.dim,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>← Back</button>
-            <button onClick={handlePay} style={{ flex:2,padding:"12px 0",borderRadius:8,border:"none",background:T.stripe,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Pay {SHIFT_PRICES[form.type]} via Stripe →</button>
+            <button onClick={handlePay} style={{ flex:2,padding:"12px 0",borderRadius:8,border:"none",background:T.stripe,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Pay {price} via Stripe →</button>
           </div>
         </div>
       )}
