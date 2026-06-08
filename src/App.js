@@ -22,18 +22,18 @@ function getSupabase() {
 
 // ─── Stripe Payment Links ────────────────────────────────────────────────────
 const SHIFT_LINKS = {
-  standard:  "https://buy.stripe.com/9B66oA7N38Gi4e25cLa7C0d",
-  evening:   "https://buy.stripe.com/aFa00cd7naOq7qedJha7C0c",
-  weekend:   "https://buy.stripe.com/8x26oA6IZ8Gi8ui9t1a7C0b",
-  emergency: "https://buy.stripe.com/5kQcMY8R7bSu5i6bB9a7C0a",
+  standard:  "https://buy.stripe.com/bJebIUffv5u6fWK0Wva7C08",
+  evening:   "https://buy.stripe.com/00w28kgjz7Ce8uicFda7C09",
+  weekend:   "https://buy.stripe.com/aFa00cd7naOq7qedJha7C0c",
+  emergency: "https://buy.stripe.com/8x26oA6IZ8Gi8ui9t1a7C0b",
 };
 const BUNDLE_LINKS = {
-  three: "https://buy.stripe.com/00w28kgjz7Ce8uicFda7C09",
-  five:  "https://buy.stripe.com/bJebIUffv5u6fWK0Wva7C08",
+  three: "https://buy.stripe.com/9B66oA7N38Gi4e25cLa7C0d",
+  five:  "https://buy.stripe.com/5kQcMY8R7bSu5i6bB9a7C0a",
   eight: "https://buy.stripe.com/4gM3co4AR6yacKydJha7C07",
 };
-const PRICES = { standard: 14, evening: 14, weekend: 19, emergency: 24 };
-const BUNDLE_PRICES = { three: 35, five: 55, eight: 80 };
+const PRICES = { standard: 9, evening: 9, weekend: 14, emergency: 19 };
+const BUNDLE_PRICES = { three: 20, five: 30, eight: 45 };
 
 const REGIONS = [
   "Perth Metro - North",
@@ -375,10 +375,10 @@ function PostShiftModal(props) {
                     value: form.shift_type,
                     onChange: setField("shift_type"),
                   },
-                    React.createElement("option", { value: "standard" },  "Standard ($14)"),
-                    React.createElement("option", { value: "evening" },   "Evening ($14)"),
-                    React.createElement("option", { value: "weekend" },   "Weekend ($19)"),
-                    React.createElement("option", { value: "emergency" }, "Emergency ($24)")
+                    React.createElement("option", { value: "standard" },  "Standard ($9)"),
+                    React.createElement("option", { value: "evening" },   "Evening ($9)"),
+                    React.createElement("option", { value: "weekend" },   "Weekend ($14)"),
+                    React.createElement("option", { value: "emergency" }, "Emergency ($19)")
                   )
                 ),
                 React.createElement("div", { style: fieldStyle },
@@ -868,13 +868,13 @@ export default function App() {
   ].join("\n");
 
   var pricingItems = [
-    { label: "Standard Shift",  price: 14, icon: "☀️",  sub: "Mon-Fri business hours" },
-    { label: "Evening Shift",   price: 14, icon: "🌙",  sub: "After-hours weekday" },
-    { label: "Weekend Shift",   price: 19, icon: "📅",  sub: "Saturday or Sunday" },
-    { label: "Emergency Shift", price: 24, icon: "🚨",  sub: "Same-day urgent cover" },
-    { label: "3-Day Bundle",    price: 35, icon: "📦",  sub: "Save vs 3 singles" },
-    { label: "5-Day Bundle",    price: 55, icon: "⭐",  sub: "Most popular" },
-    { label: "8-Day Bundle",    price: 80, icon: "💎",  sub: "Best value" },
+    { label: "Standard Shift",  price: 9,  icon: "☀️",  sub: "Mon-Fri business hours" },
+    { label: "Evening Shift",   price: 9,  icon: "🌙",  sub: "After-hours weekday" },
+    { label: "Weekend Shift",   price: 14, icon: "📅",  sub: "Saturday or Sunday" },
+    { label: "Emergency Shift", price: 19, icon: "🚨",  sub: "Same-day urgent cover" },
+    { label: "3-Day Bundle",    price: 20, icon: "📦",  sub: "Save vs 3 singles" },
+    { label: "5-Day Bundle",    price: 30, icon: "⭐",  sub: "Most popular" },
+    { label: "8-Day Bundle",    price: 45, icon: "💎",  sub: "Best value" },
   ];
 
   return React.createElement(React.Fragment, null,
@@ -956,7 +956,7 @@ export default function App() {
         [
           { label: "Live Shifts",      value: String(liveCount) },
           { label: "Regions Covered",  value: "10" },
-          { label: "Listing from",     value: "$14" },
+          { label: "Listing from",     value: "$9" },
         ].map(function(stat) {
           return React.createElement("div", { key: stat.label, style: { textAlign: "center" } },
             React.createElement("div", {
