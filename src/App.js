@@ -32,8 +32,8 @@ const STRIPE_PAYMENT_LINKS = {
 };
 
 const SHIFT_PRICES = {
-  Standard:"$14 AUD", Evening:"$14 AUD",
-  Weekend:"$19 AUD", Emergency:"$24 AUD",
+  Standard:"$9 AUD", Evening:"$9 AUD",
+  Weekend:"$14 AUD", Emergency:"$19 AUD",
 };
 
 // ── Supabase client (lightweight fetch-based) ─────────────────────────────────
@@ -371,9 +371,9 @@ function ApplyModal({ shift, onClose, onConfirm }) {
 // Multi-day Stripe Payment Links (create these in Stripe dashboard)
 const BUNDLE_LINKS = {
   1: null, // uses STRIPE_PAYMENT_LINKS per type
-  3: "https://buy.stripe.com/00wdR29Vbg8KeSGeNla7C04
-  5: "https://buy.stripe.com/fZu14g4ARg8KaCq0Wva7C05
-  8: "https://buy.stripe.com/7sY7sEc3j3lY11QdJha7C06
+  3: "https://buy.stripe.com/9B66oA7N38Gi4e25cLa7C0d
+  5: "https://buy.stripe.com/5kQcMY8R7bSu5i6bB9a7C0a
+  8: "https://buy.stripe.com/4gM3co4AR6yacKydJha7C07
 };
 
 const getDayCount = (start, end) => {
@@ -386,16 +386,16 @@ const getDayCount = (start, end) => {
 const getBundlePrice = (days, type) => {
   const base = { Standard:14, Evening:14, Weekend:19, Emergency:24 }[type] || 14;
   if (days <= 1) return `$${base} AUD`;
-  if (days <= 3) return `$${Math.min(days*base, 35)} AUD`;
-  if (days <= 5) return `$${Math.min(days*base, 55)} AUD`;
-  return `$${Math.min(days*base, 80)} AUD`;
+  if (days <= 3) return `$${Math.min(days*base, 20)} AUD`;
+  if (days <= 5) return `$${Math.min(days*base, 30)} AUD`;
+  return `$${Math.min(days*base, 45)} AUD`;
 };
 
 const getSaving = (days, type) => {
   const base = { Standard:14, Evening:14, Weekend:19, Emergency:24 }[type] || 14;
   if (days <= 1) return 0;
   const full = days * base;
-  const discounted = days<=3?Math.min(full,35):days<=5?Math.min(full,55):Math.min(full,80);
+  const discounted = days<=3?Math.min(full,20):days<=5?Math.min(full,30):Math.min(full,45);
   return full - discounted;
 };
 
@@ -455,12 +455,12 @@ function PostView() {
     <div style={{ maxWidth:600,animation:"fadeUp 0.3s ease" }}>
       <div style={{ fontFamily:"'Playfair Display',serif",fontSize:28,color:T.white,marginBottom:6 }}>Post a Shift</div>
       <div style={{ fontSize:14,color:T.dim,marginBottom:28,lineHeight:1.6 }}>
-        Post a single shift or a multi-day block. Posting fee: <span style={{color:T.amberText}}>$14–$24 AUD</span> per shift, with bundle discounts for multiple days.
+        Post a single shift or a multi-day block. Posting fee: <span style={{color:T.amberText}}>$9–$19 AUD</span> per shift, with bundle discounts for multiple days.
       </div>
 
       {/* Bundle info cards */}
       <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:24 }}>
-        {[["1 day","From $14"],["3 days","From $35"],["5 days","From $55"],["8 days","From $80"]].map(([l,p])=>(
+        {[["1 day","From $9"],["3 days","From $20"],["5 days","From $30"],["8 days","From $45"]].map(([l,p])=>(
           <div key={l} style={{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 8px",textAlign:"center" }}>
             <div style={{ fontSize:13,fontWeight:700,color:T.white,marginBottom:2 }}>{l}</div>
             <div style={{ fontSize:11,color:T.amber,fontWeight:600 }}>{p}</div>
@@ -652,7 +652,7 @@ const LEGAL_CONTENT = {
     sections: [
       { h: "1. About ScriptShift WA", p: "ScriptShift WA is an online marketplace operated by ScriptShift Technologies Pty Ltd (ABN 21 698 500 542) that connects pharmacy owners with locum pharmacists in Western Australia. By using our platform at scriptshiftwa.com.au, you agree to these Terms of Service." },
       { h: "2. Who Can Use ScriptShift WA", p: "Pharmacy owners must be the owner, manager or authorised representative of a pharmacy operating in Western Australia and hold all necessary licences under the Pharmacy Act 2010 (WA). Pharmacists must be currently registered with AHPRA with an active, unconditional registration. You are responsible for maintaining the confidentiality of your account credentials." },
-      { h: "3. Shift Posting Fees", p: "Posting fees: Standard $14 AUD · Evening $14 AUD · Weekend $19 AUD · Emergency $24 AUD · 3-Day Bundle $35 AUD · 5-Day Bundle $55 AUD · 8-Day Bundle $80 AUD (all GST inclusive). Fees are non-refundable once a shift is published. We reserve the right to update fees with 7 days' notice." },
+      { h: "3. Shift Posting Fees", p: "Posting fees: Standard $9 AUD · Evening $9 AUD · Weekend $14 AUD · Emergency $19 AUD · 3-Day Bundle $20 AUD · 5-Day Bundle $30 AUD · 8-Day Bundle $45 AUD (all GST inclusive). Fees are non-refundable once a shift is published. We reserve the right to update fees with 7 days' notice." },
       { h: "4. AHPRA Verification", p: "Pharmacists must provide their valid AHPRA registration number during sign-up. By providing this number, you confirm your registration is current and unconditional. ScriptShift WA displays your AHPRA number to pharmacy owners for verification purposes. It is the pharmacy owner's responsibility to confirm registration status before engaging a pharmacist." },
       { h: "5. The Relationship Between Users", p: "ScriptShift WA is a marketplace platform only. We are not a party to any employment or contractor agreement between pharmacy owners and pharmacists. We are not responsible for the conduct of any user, accuracy of shift details, disputes arising from engagements, or payment of wages. Users are solely responsible for ensuring compliance with all applicable laws including the Pharmacy Industry Award 2020." },
       { h: "6. Prohibited Conduct", p: "Users must not: provide false information including false AHPRA numbers; post shifts for pharmacies they are not authorised to represent; use the platform unlawfully; circumvent our payment system; or harass other users. Breach may result in immediate account suspension." },
