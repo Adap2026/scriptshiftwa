@@ -22,15 +22,15 @@ function getSupabase() {
 
 // ─── Stripe Payment Links ────────────────────────────────────────────────────
 const SHIFT_LINKS = {
-  standard:  "https://buy.stripe.com/your_standard_link",
-  evening:   "https://buy.stripe.com/your_evening_link",
-  weekend:   "https://buy.stripe.com/your_weekend_link",
-  emergency: "https://buy.stripe.com/your_emergency_link",
+  standard:  "https://buy.stripe.com/9B66oA7N38Gi4e25cLa7C0d",
+  evening:   "https://buy.stripe.com/aFa00cd7naOq7qedJha7C0c",
+  weekend:   "https://buy.stripe.com/8x26oA6IZ8Gi8ui9t1a7C0b",
+  emergency: "https://buy.stripe.com/5kQcMY8R7bSu5i6bB9a7C0a",
 };
 const BUNDLE_LINKS = {
-  three: "https://buy.stripe.com/your_3day_bundle",
-  five:  "https://buy.stripe.com/your_5day_bundle",
-  eight: "https://buy.stripe.com/your_8day_bundle",
+  three: "https://buy.stripe.com/00w28kgjz7Ce8uicFda7C09",
+  five:  "https://buy.stripe.com/bJebIUffv5u6fWK0Wva7C08",
+  eight: "https://buy.stripe.com/4gM3co4AR6yacKydJha7C07",
 };
 const PRICES = { standard: 14, evening: 14, weekend: 19, emergency: 24 };
 const BUNDLE_PRICES = { three: 35, five: 55, eight: 80 };
