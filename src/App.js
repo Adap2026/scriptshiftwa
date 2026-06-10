@@ -557,43 +557,92 @@ function ProfileView({ user, token, onSignOut }) {
   const meta = user?.user_metadata || {};
   const [editing, setEditing] = useState(false);
   const [saving, setSaving]   = useState(false);
-  const [form, setForm]       = useState({ full_name: meta.full_name||"", phone: meta.phone||"", min_rate:"60", open_to_travel: meta.open_to_travel||false });
+  const [saved, setSaved]     = useState(false);
+  const [form, setForm] = useState({
+    full_name: meta.full_name||"",
+    phone: meta.phone||"",
+    min_rate: meta.min_rate||"60",
+    open_to_travel: meta.open_to_travel||false,
+    software: meta.software||"",
+    ahpra_number: meta.ahpra_number||"",
+    regions: meta.regions||"",
+  });
   const set = k => e => setForm(p=>({...p,[k]:e.target.value}));
 
   const handleSave = async () => {
     setSaving(true);
-    try { await supaUpdateProfile(token, user.id, form); setEditing(false); } catch {}
+    try {
+      // Update Supabase Auth user metadata
+      const res = await fetch(SUPA_URL + "/auth/v1/user", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPA_KEY,
+          "Authorization": "Bearer " + (token || SUPA_KEY),
+        },
+        body: JSON.stringify({ data: form })
+      });
+      // Also update profiles table
+      await supaUpdateProfile(token, user.id, {
+        full_name: form.full_name,
+        phone: form.phone,
+      });
+      setSaved(true);
+      setEditing(false);
+      setTimeout(()=>setSaved(false), 3000);
+    } catch(e) { console.warn("Save error:", e); }
     setSaving(false);
   };
 
-  const inputStyle = { width:"100%",background:T.bg,border:`1px solid ${T.border}`,borderRadius:8,padding:"9px 14px",fontSize:14,color:T.white,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box" };
-  const labelStyle = { fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:0.8,textTransform:"uppercase",display:"block",marginBottom:6 };
+  const inputSt = { width:"100%",background:T.bg,border:`1px solid ${T.border}`,borderRadius:8,padding:"9px 14px",fontSize:14,color:T.white,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:16 };
+  const lblSt = { fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:0.8,textTransform:"uppercase",display:"block",marginBottom:6 };
+
+  const SOFTWARE_OPTIONS = ["Fred Dispense","Minfos","LOTS","Corum Health","Other"];
 
   return (
-    <div style={{ animation:"fadeUp 0.3s ease",maxWidth:520 }}>
+    <div style={{ animation:"fadeUp 0.3s ease",maxWidth:560 }}>
+      {saved && (
+        <div style={{ background:T.mintDim,border:`1px solid ${T.mint}`,borderRadius:10,padding:"10px 16px",marginBottom:16,fontSize:13,color:T.mintText,fontWeight:600 }}>
+          ✓ Profile updated successfully!
+        </div>
+      )}
       <div style={{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:16,padding:28 }}>
+        {/* Header */}
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20 }}>
           <div style={{ display:"flex",alignItems:"center",gap:16 }}>
             <div style={{ width:64,height:64,borderRadius:"50%",background:`linear-gradient(135deg,${T.amber},#C05621)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24 }}>💊</div>
             <div>
-              <div style={{ fontFamily:"'Playfair Display',serif",fontSize:20,color:T.white,marginBottom:2 }}>{meta.full_name || "Pharmacist"}</div>
+              <div style={{ fontFamily:"'Playfair Display',serif",fontSize:20,color:T.white,marginBottom:2 }}>{form.full_name || meta.full_name || "Pharmacist"}</div>
               <div style={{ fontSize:12,color:T.dim }}>{user?.email}</div>
-              <div style={{ fontSize:11,color:T.mint,marginTop:4,fontWeight:600 }}>✓ AHPRA: {meta.ahpra_number || "Pending verification"}</div>
+              <div style={{ fontSize:11,color:T.mint,marginTop:4,fontWeight:600 }}>✓ AHPRA: {form.ahpra_number || meta.ahpra_number || "Pending"}</div>
             </div>
           </div>
-          <button onClick={()=>setEditing(!editing)} style={{ background:"transparent",border:`1px solid ${T.border}`,color:T.dim,borderRadius:8,padding:"6px 14px",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
-            {editing ? "Cancel" : "Edit"}
+          <button onClick={()=>setEditing(!editing)} style={{ background:editing?T.amberDim:"transparent",border:`1px solid ${editing?T.amber:T.border}`,color:editing?T.amberText:T.dim,borderRadius:8,padding:"6px 16px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+            {editing ? "Cancel" : "✏ Edit Profile"}
           </button>
         </div>
+
         {!editing ? (
           <>
-            <div style={{ display:"flex",gap:0,padding:"16px 0",borderTop:`1px solid ${T.border}`,borderBottom:`1px solid ${T.border}`,marginBottom:20 }}>
-              {[["Software",meta.software||"—"],["Phone",meta.phone||"—"],["Travel",meta.open_to_travel?"Yes":"No"]].map(([l,v])=>(
-                <div key={l} style={{ flex:1,textAlign:"center" }}>
+            {/* Stats row */}
+            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",padding:"16px 0",borderTop:`1px solid ${T.border}`,borderBottom:`1px solid ${T.border}`,marginBottom:20,gap:8 }}>
+              {[
+                ["Software", form.software||meta.software||"—"],
+                ["Phone", form.phone||meta.phone||"—"],
+                ["Min Rate", "$" + (form.min_rate||meta.min_rate||"60") + "/hr"],
+              ].map(([l,v])=>(
+                <div key={l} style={{ textAlign:"center" }}>
                   <div style={{ fontSize:13,color:T.white,fontWeight:600,marginBottom:2 }}>{v}</div>
                   <div style={{ fontSize:10,color:T.dimmer,textTransform:"uppercase",letterSpacing:0.5 }}>{l}</div>
                 </div>
               ))}
+            </div>
+            {/* AHPRA & Regions */}
+            <div style={{ background:T.bg,borderRadius:10,padding:"14px 16px",border:`1px solid ${T.border}`,marginBottom:12 }}>
+              <div style={{ fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8 }}>Registration</div>
+              <div style={{ fontSize:13,color:T.white }}>AHPRA: <span style={{color:T.mint,fontWeight:600}}>{form.ahpra_number||meta.ahpra_number||"Not set"}</span></div>
+              {(form.regions||meta.regions) && <div style={{ fontSize:13,color:T.dim,marginTop:4 }}>Regions: {form.regions||meta.regions}</div>}
+              <div style={{ fontSize:13,color:T.dim,marginTop:4 }}>Open to travel: {form.open_to_travel?"Yes":"No"}</div>
             </div>
             <div style={{ background:T.bg,borderRadius:10,padding:"14px 16px",border:`1px solid ${T.border}`,marginBottom:20 }}>
               <div style={{ fontSize:12,fontWeight:700,color:T.amber,marginBottom:4,letterSpacing:0.5 }}>🔔 REAL-TIME ALERTS ACTIVE</div>
@@ -605,21 +654,47 @@ function ProfileView({ user, token, onSignOut }) {
           </>
         ) : (
           <>
-            <div style={{marginBottom:14}}>
-              <label style={labelStyle}>Full Name</label>
-              <input style={inputStyle} value={form.full_name} onChange={set("full_name")} />
+            <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14 }}>
+              <div>
+                <label style={lblSt}>Full Name</label>
+                <input style={inputSt} value={form.full_name} onChange={set("full_name")} placeholder="Your full name" />
+              </div>
+              <div>
+                <label style={lblSt}>Phone</label>
+                <input style={inputSt} type="tel" value={form.phone} onChange={set("phone")} placeholder="04xx xxx xxx" />
+              </div>
+              <div>
+                <label style={lblSt}>AHPRA Number</label>
+                <input style={inputSt} value={form.ahpra_number} onChange={set("ahpra_number")} placeholder="PHA0001234567" />
+              </div>
+              <div>
+                <label style={lblSt}>Min Rate ($/hr)</label>
+                <input style={inputSt} type="number" value={form.min_rate} onChange={set("min_rate")} placeholder="60" />
+              </div>
             </div>
-            <div style={{marginBottom:14}}>
-              <label style={labelStyle}>Phone</label>
-              <input style={inputStyle} value={form.phone} onChange={set("phone")} />
+            <div style={{marginBottom:16}}>
+              <label style={lblSt}>Dispensing Software</label>
+              <select style={inputSt} value={form.software} onChange={set("software")}>
+                <option value="">Select software...</option>
+                {SOFTWARE_OPTIONS.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
-            <div style={{marginBottom:20}}>
-              <label style={labelStyle}>Minimum Rate ($/hr)</label>
-              <input type="number" style={inputStyle} value={form.min_rate} onChange={set("min_rate")} />
+            <div style={{marginBottom:16}}>
+              <label style={lblSt}>Preferred Regions</label>
+              <input style={inputSt} value={form.regions} onChange={set("regions")} placeholder="e.g. Perth Metro, Pilbara" />
             </div>
-            <button onClick={handleSave} disabled={saving} style={{ width:"100%",padding:"11px 0",borderRadius:8,border:"none",background:T.mint,color:"#000",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
-              {saving ? "Saving…" : "Save Changes"}
-            </button>
+            <label style={{ display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:20,fontSize:13,color:T.white }}>
+              <input type="checkbox" checked={form.open_to_travel} onChange={e=>setForm(p=>({...p,open_to_travel:e.target.checked}))} style={{accentColor:T.mint,width:16,height:16}} />
+              Open to regional travel and accommodation
+            </label>
+            <div style={{ display:"flex",gap:10 }}>
+              <button onClick={()=>setEditing(false)} style={{ flex:1,padding:"11px 0",borderRadius:8,border:`1px solid ${T.border}`,background:"transparent",color:T.dim,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+                Cancel
+              </button>
+              <button onClick={handleSave} disabled={saving} style={{ flex:2,padding:"11px 0",borderRadius:8,border:"none",background:T.mint,color:"#000",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+                {saving ? "Saving…" : "✓ Save Changes"}
+              </button>
+            </div>
           </>
         )}
       </div>
