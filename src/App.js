@@ -941,8 +941,8 @@ export default function App() {
               </div>
               <div>
                 <div style={{ fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:1,textTransform:"uppercase",marginBottom:10 }}>Contact</div>
-                <div style={{ fontSize:13,color:T.dim,marginBottom:8 }}>hello@scriptshiftwa.com.au</div>
-                <div style={{ fontSize:13,color:T.dim,marginBottom:8 }}>scriptshiftwa.com.au</div>
+                <div style={{ marginBottom:8 }}><span onClick={()=>window.location.href="mailto:hello@scriptshiftwa.com.au"} style={{ fontSize:13,color:T.amber,cursor:"pointer" }}>hello@scriptshiftwa.com.au</span></div>
+                <div style={{ marginBottom:8 }}><span onClick={()=>window.open("https://scriptshiftwa.com.au","_blank")} style={{ fontSize:13,color:T.amber,cursor:"pointer" }}>scriptshiftwa.com.au</span></div>
                 <div style={{ fontSize:13,color:T.dim }}>Perth, Western Australia</div>
               </div>
             </div>
