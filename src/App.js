@@ -279,7 +279,7 @@ function AuthModal({ onClose, onSuccess }) {
 }
 
 // ── SHIFT CARD ────────────────────────────────────────────────────────────────
-function ShiftCard({ shift, applied, onApply, user, animDelay }) {
+function ShiftCard({ shift, applied, onApply, user, token, animDelay }) {
   const badge = SHIFT_BADGE[shift.type] || SHIFT_BADGE.Standard;
   const [hovered, setHovered] = useState(false);
 
@@ -313,10 +313,19 @@ function ShiftCard({ shift, applied, onApply, user, animDelay }) {
       <div style={{ fontFamily:"'Playfair Display',serif",fontWeight:700,fontSize:24,color:T.white,lineHeight:1 }}>${shift.rate}<span style={{fontSize:13,fontWeight:400,color:T.dim}}>/hr</span></div>
       <div style={{ fontSize:11,color:T.dimmer,marginTop:3,marginBottom:14 }}>{shift.posted} · {shift.applicant_count} {shift.applicant_count===1?"applicant":"applicants"}</div>
       <div style={{ paddingTop:14,borderTop:`1px solid ${T.border}` }}>
-        <button onClick={()=>onApply(shift)}
-          style={{ width:"100%", background:applied?T.mintDim:"transparent", color:applied?T.mintText:T.amber, border:`1.5px solid ${applied?T.mint:T.amber}`, borderRadius:8, padding:"10px 0", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"'Outfit',sans-serif", transition:"all 0.15s" }}>
-          {applied ? "✓ Applied" : user ? "Apply for this shift →" : "Sign in to Apply →"}
-        </button>
+        {user && user.id === shift.owner_id ? (
+          <div>
+            <div style={{ fontSize:12,fontWeight:700,color:T.amber,marginBottom:8,letterSpacing:0.5 }}>
+              {shift.applicant_count || 0} APPLICANT{shift.applicant_count !== 1 ? "S" : ""}
+            </div>
+            <OwnerShiftApplications shiftId={shift.id} token={token} />
+          </div>
+        ) : (
+          <button onClick={()=>onApply(shift)}
+            style={{ width:"100%", background:applied?T.mintDim:"transparent", color:applied?T.mintText:T.amber, border:`1.5px solid ${applied?T.mint:T.amber}`, borderRadius:8, padding:"10px 0", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"'Outfit',sans-serif", transition:"all 0.15s" }}>
+            {applied ? "✓ Applied" : user ? "Apply for this shift →" : "Sign in to Apply →"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -702,6 +711,165 @@ function LegalModal({ doc, onClose }) {
   );
 }
 
+
+// ── APPLICATIONS VIEW (Pharmacist) ───────────────────────────────────────────
+function ApplicationsView({ user, token, shifts, applied, onBrowse }) {
+  const [myApps, setMyApps] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(()=>{
+    if (!user) { setLoading(false); return; }
+    const load = async () => {
+      try {
+        const res = await fetch(
+          SUPA_URL + "/rest/v1/applications?pharmacist_id=eq." + user.id + "&order=created_at.desc",
+          { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + (token || SUPA_KEY) } }
+        );
+        const data = await res.json();
+        if (Array.isArray(data)) setMyApps(data);
+      } catch(e) { console.warn(e); }
+      setLoading(false);
+    };
+    load();
+  }, [user, token]);
+
+  // Match applications with shift details
+  const appsWithShifts = myApps.map(app => ({
+    ...app,
+    shift: shifts.find(s => s.id === app.shift_id) || null
+  }));
+
+  const inputSt = { background:"transparent",border:"none",color:T.dim,cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontSize:13,fontWeight:700,padding:0 };
+
+  return (
+    <div style={{ animation:"fadeUp 0.3s ease" }}>
+      <div style={{ fontFamily:"'Playfair Display',serif",fontSize:28,color:T.white,marginBottom:6 }}>My Applications</div>
+      <div style={{ fontSize:14,color:T.dim,marginBottom:28 }}>Track your shift applications in real time.</div>
+      {loading ? (
+        <div style={{ textAlign:"center",padding:"40px 0",color:T.dim }}>Loading...</div>
+      ) : appsWithShifts.length === 0 ? (
+        <div style={{ textAlign:"center",padding:"60px 20px",color:T.dim }}>
+          <div style={{ fontSize:48,marginBottom:16,opacity:0.4 }}>◎</div>
+          <div style={{ fontFamily:"'Playfair Display',serif",fontSize:22,color:T.white,marginBottom:8 }}>No applications yet</div>
+          <div style={{ fontSize:14,color:T.dim,marginBottom:20 }}>Browse available shifts and apply to get started.</div>
+          <button onClick={onBrowse} style={{ background:"transparent",border:`1.5px solid ${T.amber}`,color:T.amber,borderRadius:8,padding:"10px 28px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Browse Shifts →</button>
+        </div>
+      ) : (
+        <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
+          {appsWithShifts.map((app,i) => (
+            <div key={i} style={{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"18px 20px" }}>
+              <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8,marginBottom:10 }}>
+                <div>
+                  <div style={{ fontWeight:700,fontSize:15,color:T.white,marginBottom:3 }}>
+                    {app.shift ? app.shift.pharmacy_name : "Shift #" + app.shift_id.slice(0,8)}
+                  </div>
+                  {app.shift && (
+                    <div style={{ fontSize:12,color:T.dim }}>
+                      📍 {app.shift.location} · 📅 {app.shift.shift_date} · 💰 ${app.shift.rate}/hr
+                    </div>
+                  )}
+                </div>
+                <span style={{
+                  fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,textTransform:"uppercase",letterSpacing:0.5,
+                  background: app.status==="accepted" ? T.mintDim : app.status==="declined" ? T.coralDim : T.amberDim,
+                  color: app.status==="accepted" ? T.mintText : app.status==="declined" ? T.coral : T.amberText,
+                  border: `1px solid ${app.status==="accepted" ? T.mint : app.status==="declined" ? T.coral : T.amber}`,
+                }}>
+                  {app.status || "Pending"}
+                </span>
+              </div>
+              {app.message && (
+                <div style={{ fontSize:12,color:T.dim,fontStyle:"italic",borderTop:`1px solid ${T.border}`,paddingTop:8 }}>
+                  "{app.message}"
+                </div>
+              )}
+              <div style={{ fontSize:11,color:T.dimmer,marginTop:6 }}>
+                Applied {new Date(app.created_at).toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── OWNER APPLICATIONS VIEW ───────────────────────────────────────────────────
+function OwnerShiftApplications({ shiftId, token }) {
+  const [apps, setApps] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(()=>{
+    const load = async () => {
+      try {
+        const res = await fetch(
+          SUPA_URL + "/rest/v1/applications?shift_id=eq." + shiftId + "&order=created_at.asc",
+          { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + (token || SUPA_KEY) } }
+        );
+        const data = await res.json();
+        if (Array.isArray(data)) setApps(data);
+      } catch(e) { console.warn(e); }
+      setLoading(false);
+    };
+    load();
+  }, [shiftId, token]);
+
+  const updateStatus = async (appId, newStatus) => {
+    await fetch(SUPA_URL + "/rest/v1/applications?id=eq." + appId, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPA_KEY,
+        "Authorization": "Bearer " + (token || SUPA_KEY),
+        "Prefer": "return=minimal"
+      },
+      body: JSON.stringify({ status: newStatus })
+    });
+    setApps(prev => prev.map(a => a.id === appId ? {...a, status: newStatus} : a));
+  };
+
+  if (loading) return React.createElement("div", { style:{color:T.dim,fontSize:13,padding:"8px 0"} }, "Loading applications...");
+  if (apps.length === 0) return React.createElement("div", { style:{color:T.dim,fontSize:13,fontStyle:"italic"} }, "No applications yet.");
+
+  return React.createElement("div", { style:{marginTop:12,display:"flex",flexDirection:"column",gap:8} },
+    apps.map((app,i) => React.createElement("div", {
+      key:i,
+      style:{ background:T.bg,borderRadius:8,padding:"12px 14px",border:`1px solid ${T.border}` }
+    },
+      React.createElement("div", { style:{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8} },
+        React.createElement("div", null,
+          React.createElement("div", { style:{fontSize:13,fontWeight:600,color:T.white,marginBottom:2} },
+            app.pharmacist_id.slice(0,8) + "..."
+          ),
+          app.message ? React.createElement("div", { style:{fontSize:12,color:T.dim,fontStyle:"italic"} }, '"' + app.message + '"') : null,
+          React.createElement("div", { style:{fontSize:11,color:T.dimmer,marginTop:3} },
+            new Date(app.created_at).toLocaleDateString("en-AU",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})
+          )
+        ),
+        React.createElement("div", { style:{display:"flex",gap:6} },
+          app.status === "pending" ? React.createElement(React.Fragment, null,
+            React.createElement("button", {
+              onClick: ()=>updateStatus(app.id,"accepted"),
+              style:{ background:T.mintDim,color:T.mintText,border:`1px solid ${T.mint}`,borderRadius:6,padding:"5px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }
+            }, "Accept"),
+            React.createElement("button", {
+              onClick: ()=>updateStatus(app.id,"declined"),
+              style:{ background:T.coralDim,color:T.coral,border:`1px solid ${T.coral}`,borderRadius:6,padding:"5px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }
+            }, "Decline")
+          ) : React.createElement("span", {
+            style:{
+              fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:20,
+              background: app.status==="accepted"?T.mintDim:T.coralDim,
+              color: app.status==="accepted"?T.mintText:T.coral,
+              textTransform:"uppercase",letterSpacing:0.5
+            }
+          }, app.status)
+        )
+      )
+    ))
+  );
+}
+
 // ── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [view, setView]         = useState("browse");
@@ -733,17 +901,18 @@ export default function App() {
   },[]);
 
   // Load shifts from Supabase
+  const loadShifts = async () => {
+    try {
+      const res = await fetch(
+        SUPA_URL + "/rest/v1/shifts?status=eq.active&order=shift_date.asc",
+        { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY } }
+      );
+      const data = await res.json();
+      if (Array.isArray(data)) { setShifts(data); setLiveCount(data.length); }
+    } catch(e) { console.warn("Shifts fetch error:", e); }
+  };
+
   useEffect(()=>{
-    const loadShifts = async () => {
-      try {
-        const res = await fetch(
-          SUPA_URL + "/rest/v1/shifts?status=eq.active&order=shift_date.asc",
-          { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY } }
-        );
-        const data = await res.json();
-        if (Array.isArray(data)) { setShifts(data); setLiveCount(data.length); }
-      } catch(e) { console.warn("Shifts fetch error:", e); }
-    };
     loadShifts();
     const interval = setInterval(loadShifts, 30000);
     return () => clearInterval(interval);
@@ -774,7 +943,44 @@ export default function App() {
   };
 
   const handleApply = (shift) => { if (!user) { setShowAuth(true); return; } setTarget(shift); };
-  const confirmApply = () => { setApplied(prev=>new Set([...prev,applyTarget.id])); setTarget(null); showToast("Application sent — the pharmacy owner has been notified."); };
+  const confirmApply = async (msg) => {
+    const shiftId = applyTarget.id;
+    const userId = user?.id;
+    if (!userId) return;
+    try {
+      // Save application to Supabase
+      const res = await fetch(SUPA_URL + "/rest/v1/applications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPA_KEY,
+          "Authorization": "Bearer " + (token || SUPA_KEY),
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({
+          shift_id: shiftId,
+          pharmacist_id: userId,
+          message: msg || "",
+          status: "pending"
+        })
+      });
+      // Update applicant_count on shift
+      await fetch(SUPA_URL + "/rest/v1/rpc/increment_applicant_count", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPA_KEY,
+          "Authorization": "Bearer " + (token || SUPA_KEY)
+        },
+        body: JSON.stringify({ shift_id_input: shiftId })
+      });
+    } catch(e) { console.warn("Apply error:", e); }
+    setApplied(prev=>new Set([...prev,shiftId]));
+    setTarget(null);
+    // Reload shifts to update applicant count
+    loadShifts();
+    showToast("Application sent — the pharmacy owner has been notified.");
+  };
 
   const filtered = shifts.filter(s=>{
     if(regionFilter!=="All"&&s.region!==regionFilter) return false;
@@ -877,24 +1083,14 @@ export default function App() {
                 <button onClick={()=>setView("post")} style={{ background:T.amber,color:"#000",border:"none",borderRadius:9,padding:"12px 28px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Post the First Shift →</button>
               </div>
             ) : filtered.map((s,i)=>(
-              <ShiftCard key={s.id} shift={s} applied={applied.has(s.id)} onApply={handleApply} user={user} animDelay={i*0.06} />
+              <ShiftCard key={s.id} shift={s} applied={applied.has(s.id)} onApply={handleApply} user={user} token={token} animDelay={i*0.06} />
             ))}
           </div>
         </>}
 
         {view==="post"    && <PostView />}
         {view==="applied" && (
-          <div style={{ animation:"fadeUp 0.3s ease" }}>
-            <div style={{ fontFamily:"'Playfair Display',serif",fontSize:28,color:T.white,marginBottom:6 }}>My Applications</div>
-            <div style={{ fontSize:14,color:T.dim,marginBottom:28 }}>Track your shift applications in real time.</div>
-            {applied.size===0 ? (
-              <div style={{ textAlign:"center",padding:"60px 20px",color:T.dim }}>
-                <div style={{ fontSize:48,marginBottom:16,opacity:0.4 }}>◎</div>
-                <div style={{ fontFamily:"'Playfair Display',serif",fontSize:22,color:T.white,marginBottom:8 }}>No applications yet</div>
-                <button onClick={()=>setView("browse")} style={{ marginTop:16,background:"transparent",border:`1.5px solid ${T.amber}`,color:T.amber,borderRadius:8,padding:"10px 28px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Browse Shifts →</button>
-              </div>
-            ) : <div style={{color:T.dim,fontSize:14}}>Your applications will appear here.</div>}
-          </div>
+          <ApplicationsView user={user} token={token} shifts={shifts} applied={applied} onBrowse={()=>setView("browse")} />
         )}
         {view==="profile" && user && <ProfileView user={user} token={token} onSignOut={handleSignOut} />}
       </main>
