@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars */
+/* eslint-disable */
 import { useState, useEffect } from "react";
 
 // ── Fonts ─────────────────────────────────────────────────────────────────────
@@ -37,8 +37,8 @@ const SHIFT_PRICES = {
 };
 
 // ── Supabase client (lightweight fetch-based) ─────────────────────────────────
-const SUPA_URL  = process.env.REACT_APP_SUPABASE_URL  || "";
-const SUPA_KEY  = process.env.REACT_APP_SUPABASE_ANON_KEY || "";
+const SUPA_URL  = "https://ageszwwbtawphfmtmrfj.supabase.co";
+const SUPA_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFnZXN6d3didGF3cGhmbXRtcmZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjM0MzgsImV4cCI6MjA5NTY5OTQzOH0.YkPqcazPk11CoCecf1m9LCIU9zXIH96XnIDtvRyZVWE";
 
 const supaHeaders = (token) => ({
   "Content-Type": "application/json",
@@ -111,8 +111,7 @@ function AuthModal({ onClose, onSuccess }) {
     setLoading(true); setError("");
     try {
       const data = await supaSignIn({ email:form.email, password:form.password });
-      localStorage.setItem("ss_token", data.access_token);
-      localStorage.setItem("ss_user", JSON.stringify(data.user));
+      try { localStorage.setItem("ss_token", data.access_token); localStorage.setItem("ss_user", JSON.stringify(data.user)); } catch(e) {}
       onSuccess(data);
     } catch(e) { setError(e.message); }
     setLoading(false);
@@ -704,7 +703,7 @@ function LegalModal({ doc, onClose }) {
 }
 
 // ── MAIN APP ──────────────────────────────────────────────────────────────────
-export default function ScriptShiftWA() {
+export default function App() {
   const [view, setView]         = useState("browse");
   const [regionFilter, setReg]  = useState("All");
   const [typeFilter, setType]   = useState("All");
@@ -721,14 +720,16 @@ export default function ScriptShiftWA() {
   const [legalDoc, setLegalDoc] = useState(null);
 
   useEffect(()=>{
-    const t = localStorage.getItem("ss_token");
-    const u = localStorage.getItem("ss_user");
-    if (t && u) { setToken(t); setUser(JSON.parse(u)); }
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("payment")==="success") {
-      showToast("🎉 Payment confirmed! Your shift is now live.");
-      window.history.replaceState({},"",window.location.pathname);
-    }
+    try {
+      const t = localStorage.getItem("ss_token");
+      const u = localStorage.getItem("ss_user");
+      if (t && u) { setToken(t); setUser(JSON.parse(u)); }
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("payment")==="success") {
+        showToast("🎉 Payment confirmed! Your shift is now live.");
+        window.history.replaceState({},"",window.location.pathname);
+      }
+    } catch(e) { console.warn("Session restore error:", e); }
   },[]);
 
   useEffect(()=>{
@@ -750,7 +751,7 @@ export default function ScriptShiftWA() {
 
   const handleSignOut = async () => {
     if (token) await supaSignOut(token);
-    localStorage.removeItem("ss_token"); localStorage.removeItem("ss_user");
+    try { localStorage.removeItem("ss_token"); localStorage.removeItem("ss_user"); } catch(e) {}
     setUser(null); setToken(null);
     showToast("Signed out successfully."); setView("browse");
   };
