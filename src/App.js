@@ -710,12 +710,12 @@ export default function App() {
   const [applied, setApplied]   = useState(new Set());
   const [applyTarget, setTarget]= useState(null);
   const [toast, setToast]       = useState("");
-  const [liveCount] = useState(0);
+  const [liveCount, setLiveCount] = useState(0);
   const [pulse, setPulse]       = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [user, setUser]         = useState(null);
   const [token, setToken]       = useState(null);
-  const [shifts]                = useState([]);
+  const [shifts, setShifts]     = useState([]);
   const [confirmedEmail, setConfirmedEmail] = useState(false);
   const [legalDoc, setLegalDoc] = useState(null);
 
@@ -730,6 +730,23 @@ export default function App() {
         window.history.replaceState({},"",window.location.pathname);
       }
     } catch(e) { console.warn("Session restore error:", e); }
+  },[]);
+
+  // Load shifts from Supabase
+  useEffect(()=>{
+    const loadShifts = async () => {
+      try {
+        const res = await fetch(
+          SUPA_URL + "/rest/v1/shifts?status=eq.active&order=shift_date.asc",
+          { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY } }
+        );
+        const data = await res.json();
+        if (Array.isArray(data)) { setShifts(data); setLiveCount(data.length); }
+      } catch(e) { console.warn("Shifts fetch error:", e); }
+    };
+    loadShifts();
+    const interval = setInterval(loadShifts, 30000);
+    return () => clearInterval(interval);
   },[]);
 
   useEffect(()=>{
