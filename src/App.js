@@ -943,6 +943,144 @@ function OwnerShiftApplications({ shiftId, token }) {
 }
 
 
+
+// ── APPLICANT CARD ────────────────────────────────────────────────────────────
+function ApplicantCard({ app, shift, onUpdateStatus }) {
+  const [profile, setProfile] = useState(null);
+  const [expanded, setExpanded] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+
+  const loadProfile = async () => {
+    if (profile || loadingProfile) { setExpanded(!expanded); return; }
+    setLoadingProfile(true);
+    try {
+      const res = await fetch(
+        SUPA_URL + "/rest/v1/profiles?id=eq." + app.pharmacist_id,
+        { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY } }
+      );
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) setProfile(data[0]);
+    } catch(e) { console.warn(e); }
+    setLoadingProfile(false);
+    setExpanded(true);
+  };
+
+  const ahpraUrl = profile && profile.ahpra
+    ? "https://www.ahpra.gov.au/Registration/Registers-of-Practitioners.aspx"
+    : null;
+
+  return (
+    <div style={{ background:T.bgCard,border:`1px solid ${expanded?T.amber:T.border}`,borderRadius:12,padding:"20px 22px",transition:"border-color 0.2s" }}>
+      <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:12 }}>
+        <div style={{ flex:1 }}>
+          <div style={{ fontWeight:700,fontSize:15,color:T.white,marginBottom:3 }}>
+            {shift ? shift.pharmacy_name : "Your Shift"}
+          </div>
+          <div style={{ fontSize:12,color:T.dim,marginBottom:6 }}>
+            {shift ? ("📅 " + shift.shift_date + " · 💰 $" + shift.rate + "/hr · " + shift.software) : ""}
+          </div>
+          {app.message ? (
+            <div style={{ fontSize:13,color:T.dim,fontStyle:"italic",padding:"8px 12px",background:T.bg,borderRadius:6,marginBottom:8 }}>
+              "{app.message}"
+            </div>
+          ) : null}
+          <div style={{ fontSize:11,color:T.dimmer }}>
+            Applied {new Date(app.created_at).toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}
+          </div>
+        </div>
+        <div style={{ display:"flex",flexDirection:"column",gap:8,alignItems:"flex-end" }}>
+          {app.status === "pending" || !app.status ? (
+            <div style={{ display:"flex",gap:8 }}>
+              <button onClick={()=>onUpdateStatus(app.id,"accepted")}
+                style={{ background:T.mintDim,color:T.mintText,border:"1px solid " + T.mint,borderRadius:7,padding:"8px 16px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+                ✓ Accept
+              </button>
+              <button onClick={()=>onUpdateStatus(app.id,"declined")}
+                style={{ background:T.coralDim,color:T.coral,border:"1px solid " + T.coral,borderRadius:7,padding:"8px 16px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+                ✕ Decline
+              </button>
+            </div>
+          ) : (
+            <span style={{
+              fontSize:12,fontWeight:700,padding:"6px 14px",borderRadius:20,textTransform:"uppercase",letterSpacing:0.5,
+              background: app.status==="accepted"?T.mintDim:T.coralDim,
+              color: app.status==="accepted"?T.mintText:T.coral,
+              border: "1px solid " + (app.status==="accepted"?T.mint:T.coral),
+            }}>
+              {app.status==="accepted" ? "✓ Accepted" : "✕ Declined"}
+            </span>
+          )}
+          <button onClick={loadProfile}
+            style={{ background:"transparent",border:"1px solid " + T.border,color:T.amber,borderRadius:7,padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+            {loadingProfile ? "Loading..." : expanded ? "▲ Hide Profile" : "▼ View Profile"}
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded pharmacist profile */}
+      {expanded && (
+        <div style={{ borderTop:"1px solid " + T.border,paddingTop:16,marginTop:4 }}>
+          {profile ? (
+            <div>
+              <div style={{ fontSize:12,fontWeight:700,color:T.amber,marginBottom:12,letterSpacing:0.5 }}>PHARMACIST DETAILS</div>
+              <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14 }}>
+                {[
+                  ["👤 Full Name", profile.full_name || "Not provided"],
+                  ["📱 Phone", profile.phone || "Not provided"],
+                  ["🖥 Software", profile.software || "Not specified"],
+                  ["💰 Min Rate", profile.min_rate ? "$" + profile.min_rate + "/hr" : "Not specified"],
+                  ["✈ Travel", profile.open_to_travel ? "Yes — open to travel" : "No"],
+                  ["📍 Regions", profile.regions || profile.preferred_regions || "Not specified"],
+                ].map(function(item) {
+                  return (
+                    <div key={item[0]} style={{ background:T.bg,borderRadius:8,padding:"10px 12px" }}>
+                      <div style={{ fontSize:10,color:T.dimmer,marginBottom:3,textTransform:"uppercase",letterSpacing:0.5 }}>{item[0]}</div>
+                      <div style={{ fontSize:13,color:T.white,fontWeight:500 }}>{item[1]}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* AHPRA section */}
+              <div style={{ background: profile.ahpra ? "rgba(0,229,176,0.06)" : T.bg, border:"1px solid " + (profile.ahpra ? T.mint : T.border),borderRadius:10,padding:"14px 16px",marginBottom:12 }}>
+                <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10 }}>
+                  <div>
+                    <div style={{ fontSize:11,fontWeight:700,color:profile.ahpra?T.mint:T.dimmer,letterSpacing:0.8,textTransform:"uppercase",marginBottom:4 }}>
+                      {profile.ahpra ? "✓ AHPRA Registration" : "⚠ AHPRA Registration"}
+                    </div>
+                    <div style={{ fontSize:15,fontWeight:700,color:T.white,letterSpacing:1 }}>
+                      {profile.ahpra || "Not provided"}
+                    </div>
+                    {profile.ahpra && (
+                      <div style={{ fontSize:11,color:T.dim,marginTop:4 }}>
+                        Always verify registration status before confirming a shift.
+                      </div>
+                    )}
+                  </div>
+                  {profile.ahpra && (
+                    <button
+                      onClick={()=>window.open("https://www.ahpra.gov.au/Registration/Registers-of-Practitioners.aspx","_blank")}
+                      style={{ background:T.mint,color:"#000",border:"none",borderRadius:8,padding:"10px 18px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif",whiteSpace:"nowrap" }}>
+                      🔍 Verify on AHPRA →
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div style={{ fontSize:11,color:T.dimmer,lineHeight:1.6 }}>
+                ⚠ It is your responsibility as the pharmacy owner to verify AHPRA registration before engaging this pharmacist. Click "Verify on AHPRA" to check their registration status on the official AHPRA website.
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign:"center",padding:"16px 0",color:T.dim,fontSize:13 }}>
+              No profile found for this pharmacist. They may not have completed their registration.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── OWNER APPLICATIONS DASHBOARD ─────────────────────────────────────────────
 function OwnerApplicationsDashboard({ user, token, shifts }) {
   const [apps, setApps] = useState([]);
@@ -1000,52 +1138,7 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
           {apps.map((app,i) => {
             const shift = myShifts.find(s => s.id === app.shift_id);
             return (
-              <div key={i} style={{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"20px 22px" }}>
-                <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:12 }}>
-                  <div>
-                    <div style={{ fontWeight:700,fontSize:15,color:T.white,marginBottom:3 }}>
-                      {shift ? shift.pharmacy_name : "Your Shift"}
-                    </div>
-                    <div style={{ fontSize:12,color:T.dim,marginBottom:4 }}>
-                      {shift ? ("📅 " + shift.shift_date + " · 💰 $" + shift.rate + "/hr · " + shift.software) : ""}
-                    </div>
-                    <div style={{ fontSize:12,color:T.dimmer }}>
-                      Applicant ID: {app.pharmacist_id ? app.pharmacist_id.slice(0,8) + "..." : "Unknown"}
-                    </div>
-                    {app.message ? (
-                      <div style={{ fontSize:13,color:T.dim,fontStyle:"italic",marginTop:6,padding:"8px 12px",background:T.bg,borderRadius:6 }}>
-                        "{app.message}"
-                      </div>
-                    ) : null}
-                    <div style={{ fontSize:11,color:T.dimmer,marginTop:6 }}>
-                      Applied {new Date(app.created_at).toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}
-                    </div>
-                  </div>
-                  <div>
-                    {app.status === "pending" || !app.status ? (
-                      <div style={{ display:"flex",gap:8 }}>
-                        <button onClick={()=>updateStatus(app.id,"accepted")}
-                          style={{ background:T.mintDim,color:T.mintText,border:"1px solid " + T.mint,borderRadius:7,padding:"8px 16px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
-                          ✓ Accept
-                        </button>
-                        <button onClick={()=>updateStatus(app.id,"declined")}
-                          style={{ background:T.coralDim,color:T.coral,border:"1px solid " + T.coral,borderRadius:7,padding:"8px 16px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
-                          ✕ Decline
-                        </button>
-                      </div>
-                    ) : (
-                      <span style={{
-                        fontSize:12,fontWeight:700,padding:"6px 14px",borderRadius:20,textTransform:"uppercase",letterSpacing:0.5,
-                        background: app.status==="accepted"?T.mintDim:T.coralDim,
-                        color: app.status==="accepted"?T.mintText:T.coral,
-                        border: "1px solid " + (app.status==="accepted"?T.mint:T.coral),
-                      }}>
-                        {app.status==="accepted" ? "✓ Accepted" : "✕ Declined"}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <ApplicantCard key={i} app={app} shift={shift} onUpdateStatus={updateStatus} />
             );
           })}
         </div>
