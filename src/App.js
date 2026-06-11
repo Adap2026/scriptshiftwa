@@ -1027,10 +1027,10 @@ function ApplicantCard({ app, shift, onUpdateStatus }) {
                 {[
                   ["👤 Full Name", profile.full_name || "Not provided"],
                   ["📱 Phone", profile.phone || "Not provided"],
-                  ["🖥 Software", profile.software || "Not specified"],
+                  ["🖥 Software", profile.software || profile.skills || "Not specified"],
                   ["💰 Min Rate", profile.min_rate ? "$" + profile.min_rate + "/hr" : "Not specified"],
                   ["✈ Travel", profile.open_to_travel ? "Yes — open to travel" : "No"],
-                  ["📍 Regions", profile.regions || profile.preferred_regions || "Not specified"],
+                  ["📍 Regions", profile.available_regions || profile.regions || "Not specified"],
                 ].map(function(item) {
                   return (
                     <div key={item[0]} style={{ background:T.bg,borderRadius:8,padding:"10px 12px" }}>
@@ -1042,22 +1042,22 @@ function ApplicantCard({ app, shift, onUpdateStatus }) {
               </div>
 
               {/* AHPRA section */}
-              <div style={{ background: profile.ahpra ? "rgba(0,229,176,0.06)" : T.bg, border:"1px solid " + (profile.ahpra ? T.mint : T.border),borderRadius:10,padding:"14px 16px",marginBottom:12 }}>
+              <div style={{ background: profile.ahpra_number ? "rgba(0,229,176,0.06)" : T.bg, border:"1px solid " + (profile.ahpra_number ? T.mint : T.border),borderRadius:10,padding:"14px 16px",marginBottom:12 }}>
                 <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10 }}>
                   <div>
-                    <div style={{ fontSize:11,fontWeight:700,color:profile.ahpra?T.mint:T.dimmer,letterSpacing:0.8,textTransform:"uppercase",marginBottom:4 }}>
-                      {profile.ahpra ? "✓ AHPRA Registration" : "⚠ AHPRA Registration"}
+                    <div style={{ fontSize:11,fontWeight:700,color:profile.ahpra_number?T.mint:T.dimmer,letterSpacing:0.8,textTransform:"uppercase",marginBottom:4 }}>
+                      {profile.ahpra_number ? "✓ AHPRA Registration" : "⚠ AHPRA Registration"}
                     </div>
                     <div style={{ fontSize:15,fontWeight:700,color:T.white,letterSpacing:1 }}>
-                      {profile.ahpra || "Not provided"}
+                      {profile.ahpra_number || "Not provided"}
                     </div>
-                    {profile.ahpra && (
+                    {profile.ahpra_number && (
                       <div style={{ fontSize:11,color:T.dim,marginTop:4 }}>
                         Always verify registration status before confirming a shift.
                       </div>
                     )}
                   </div>
-                  {profile.ahpra && (
+                  {profile.ahpra_number && (
                     <button
                       onClick={()=>window.open("https://www.ahpra.gov.au/Registration/Registers-of-Practitioners.aspx","_blank")}
                       style={{ background:T.mint,color:"#000",border:"none",borderRadius:8,padding:"10px 18px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif",whiteSpace:"nowrap" }}>
