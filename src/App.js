@@ -795,7 +795,7 @@ function ApplicationsView({ user, token, shifts, applied, onBrowse }) {
       try {
         const res = await fetch(
           SUPA_URL + "/rest/v1/applications?pharmacist_id=eq." + user.id + "&order=created_at.desc",
-          { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + (token || SUPA_KEY) } }
+          { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY } }
         );
         const data = await res.json();
         if (Array.isArray(data)) setMyApps(data);
@@ -957,7 +957,7 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
       try {
         const res = await fetch(
           SUPA_URL + "/rest/v1/applications?shift_id=in.(" + ids.join(",") + ")&order=created_at.desc",
-          { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + (token || SUPA_KEY) } }
+          { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY } }
         );
         const data = await res.json();
         if (Array.isArray(data)) setApps(data);
@@ -1081,6 +1081,11 @@ export default function App() {
         showToast("🎉 Payment confirmed! Your shift is now live.");
         window.history.replaceState({},"",window.location.pathname);
       }
+      // Restore applied shifts from localStorage
+      const savedApplied = JSON.parse(localStorage.getItem("ss_applied") || "[]");
+      if (savedApplied.length > 0) {
+        setApplied(new Set(savedApplied));
+      }
     } catch(e) { console.warn("Session restore error:", e); }
   },[]);
 
@@ -1132,14 +1137,14 @@ export default function App() {
     const userId = user?.id;
     if (!userId) return;
     try {
-      // Save application to Supabase
+      // Save to Supabase using anon key (RLS policy allows open insert)
       const res = await fetch(SUPA_URL + "/rest/v1/applications", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "apikey": SUPA_KEY,
-          "Authorization": "Bearer " + (token || SUPA_KEY),
-          "Prefer": "return=minimal"
+          "Authorization": "Bearer " + SUPA_KEY,
+          "Prefer": "return=representation"
         },
         body: JSON.stringify({
           shift_id: shiftId,
@@ -1148,20 +1153,31 @@ export default function App() {
           status: "pending"
         })
       });
-      // Update applicant_count on shift
+      const result = await res.json();
+      if (!res.ok) {
+        console.warn("Apply failed:", result);
+        showToast("Error submitting application. Please try again.");
+        return;
+      }
+      // Save applied state to localStorage so it persists on refresh
+      try {
+        const appliedList = JSON.parse(localStorage.getItem("ss_applied") || "[]");
+        appliedList.push(shiftId);
+        localStorage.setItem("ss_applied", JSON.stringify(appliedList));
+      } catch(e) {}
+      // Increment applicant count
       await fetch(SUPA_URL + "/rest/v1/rpc/increment_applicant_count", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "apikey": SUPA_KEY,
-          "Authorization": "Bearer " + (token || SUPA_KEY)
+          "Authorization": "Bearer " + SUPA_KEY
         },
         body: JSON.stringify({ shift_id_input: shiftId })
       });
     } catch(e) { console.warn("Apply error:", e); }
     setApplied(prev=>new Set([...prev,shiftId]));
     setTarget(null);
-    // Reload shifts to update applicant count
     loadShifts();
     showToast("Application sent — the pharmacy owner has been notified.");
   };
