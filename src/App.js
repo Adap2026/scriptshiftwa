@@ -129,6 +129,7 @@ function AuthModal({ onClose, onSuccess }) {
     setError(""); setStep(3);
   };
 
+  // ── FIX: Insert profile row into profiles table after auth user is created ──
   const handleSignUpFinal = async () => {
     if (form.regions.length === 0) { setError("Please select at least one region."); return; }
     setLoading(true); setError("");
@@ -138,6 +139,30 @@ function AuthModal({ onClose, onSuccess }) {
         fullName: form.fullName, ahpra: form.ahpra,
         phone: form.phone, software: form.software.join(", "),
       });
+      // Insert profile row into profiles table immediately after auth user is created
+      if (data.user?.id) {
+        await fetch(`${SUPA_URL}/rest/v1/profiles`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPA_KEY,
+            "Authorization": `Bearer ${SUPA_KEY}`,
+            "Prefer": "return=minimal",
+          },
+          body: JSON.stringify({
+            id: data.user.id,
+            full_name: form.fullName,
+            ahpra_number: form.ahpra,
+            phone: form.phone,
+            software: form.software.join(", "),
+            role: "pharmacist",
+            min_rate: form.minRate,
+            available_regions: form.regions.join(", "),
+            open_to_travel: form.openToTravel,
+            email: form.email,
+          }),
+        });
+      }
       if (data.access_token) {
         localStorage.setItem("ss_token", data.access_token);
         localStorage.setItem("ss_user", JSON.stringify(data.user));
@@ -572,8 +597,7 @@ function ProfileView({ user, token, onSignOut }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Update Supabase Auth user metadata
-      const res = await fetch(SUPA_URL + "/auth/v1/user", {
+      await fetch(SUPA_URL + "/auth/v1/user", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -582,7 +606,6 @@ function ProfileView({ user, token, onSignOut }) {
         },
         body: JSON.stringify({ data: form })
       });
-      // Also update profiles table
       await supaUpdateProfile(token, user.id, {
         full_name: form.full_name,
         phone: form.phone,
@@ -596,7 +619,6 @@ function ProfileView({ user, token, onSignOut }) {
 
   const inputSt = { width:"100%",background:T.bg,border:`1px solid ${T.border}`,borderRadius:8,padding:"9px 14px",fontSize:14,color:T.white,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:16 };
   const lblSt = { fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:0.8,textTransform:"uppercase",display:"block",marginBottom:6 };
-
   const SOFTWARE_OPTIONS = ["Fred Dispense","Minfos","LOTS","Corum Health","Other"];
 
   return (
@@ -607,7 +629,6 @@ function ProfileView({ user, token, onSignOut }) {
         </div>
       )}
       <div style={{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:16,padding:28 }}>
-        {/* Header */}
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20 }}>
           <div style={{ display:"flex",alignItems:"center",gap:16 }}>
             <div style={{ width:64,height:64,borderRadius:"50%",background:`linear-gradient(135deg,${T.amber},#C05621)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24 }}>💊</div>
@@ -624,7 +645,6 @@ function ProfileView({ user, token, onSignOut }) {
 
         {!editing ? (
           <>
-            {/* Stats row */}
             <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr 1fr",padding:"16px 0",borderTop:`1px solid ${T.border}`,borderBottom:`1px solid ${T.border}`,marginBottom:20,gap:8 }}>
               {[
                 ["Software", form.software||meta.software||"—"],
@@ -637,7 +657,6 @@ function ProfileView({ user, token, onSignOut }) {
                 </div>
               ))}
             </div>
-            {/* AHPRA & Regions */}
             <div style={{ background:T.bg,borderRadius:10,padding:"14px 16px",border:`1px solid ${T.border}`,marginBottom:12 }}>
               <div style={{ fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:0.8,textTransform:"uppercase",marginBottom:8 }}>Registration</div>
               <div style={{ fontSize:13,color:T.white }}>AHPRA: <span style={{color:T.mint,fontWeight:600}}>{form.ahpra_number||meta.ahpra_number||"Not set"}</span></div>
@@ -655,22 +674,10 @@ function ProfileView({ user, token, onSignOut }) {
         ) : (
           <>
             <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14 }}>
-              <div>
-                <label style={lblSt}>Full Name</label>
-                <input style={inputSt} value={form.full_name} onChange={set("full_name")} placeholder="Your full name" />
-              </div>
-              <div>
-                <label style={lblSt}>Phone</label>
-                <input style={inputSt} type="tel" value={form.phone} onChange={set("phone")} placeholder="04xx xxx xxx" />
-              </div>
-              <div>
-                <label style={lblSt}>AHPRA Number</label>
-                <input style={inputSt} value={form.ahpra_number} onChange={set("ahpra_number")} placeholder="PHA0001234567" />
-              </div>
-              <div>
-                <label style={lblSt}>Min Rate ($/hr)</label>
-                <input style={inputSt} type="number" value={form.min_rate} onChange={set("min_rate")} placeholder="60" />
-              </div>
+              <div><label style={lblSt}>Full Name</label><input style={inputSt} value={form.full_name} onChange={set("full_name")} placeholder="Your full name" /></div>
+              <div><label style={lblSt}>Phone</label><input style={inputSt} type="tel" value={form.phone} onChange={set("phone")} placeholder="04xx xxx xxx" /></div>
+              <div><label style={lblSt}>AHPRA Number</label><input style={inputSt} value={form.ahpra_number} onChange={set("ahpra_number")} placeholder="PHA0001234567" /></div>
+              <div><label style={lblSt}>Min Rate ($/hr)</label><input style={inputSt} type="number" value={form.min_rate} onChange={set("min_rate")} placeholder="60" /></div>
             </div>
             <div style={{marginBottom:16}}>
               <label style={lblSt}>Dispensing Software</label>
@@ -688,9 +695,7 @@ function ProfileView({ user, token, onSignOut }) {
               Open to regional travel and accommodation
             </label>
             <div style={{ display:"flex",gap:10 }}>
-              <button onClick={()=>setEditing(false)} style={{ flex:1,padding:"11px 0",borderRadius:8,border:`1px solid ${T.border}`,background:"transparent",color:T.dim,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
-                Cancel
-              </button>
+              <button onClick={()=>setEditing(false)} style={{ flex:1,padding:"11px 0",borderRadius:8,border:`1px solid ${T.border}`,background:"transparent",color:T.dim,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Cancel</button>
               <button onClick={handleSave} disabled={saving} style={{ flex:2,padding:"11px 0",borderRadius:8,border:"none",background:T.mint,color:"#000",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
                 {saving ? "Saving…" : "✓ Save Changes"}
               </button>
@@ -783,7 +788,6 @@ function LegalModal({ doc, onClose }) {
   );
 }
 
-
 // ── APPLICATIONS VIEW (Pharmacist) ───────────────────────────────────────────
 function ApplicationsView({ user, token, shifts, applied, onBrowse }) {
   const [myApps, setMyApps] = useState([]);
@@ -805,13 +809,10 @@ function ApplicationsView({ user, token, shifts, applied, onBrowse }) {
     load();
   }, [user, token]);
 
-  // Match applications with shift details
   const appsWithShifts = myApps.map(app => ({
     ...app,
     shift: shifts.find(s => s.id === app.shift_id) || null
   }));
-
-  const inputSt = { background:"transparent",border:"none",color:T.dim,cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontSize:13,fontWeight:700,padding:0 };
 
   return (
     <div style={{ animation:"fadeUp 0.3s ease" }}>
@@ -942,8 +943,6 @@ function OwnerShiftApplications({ shiftId, token }) {
   );
 }
 
-
-
 // ── APPLICANT CARD ────────────────────────────────────────────────────────────
 function ApplicantCard({ app, shift, onUpdateStatus }) {
   const [profile, setProfile] = useState(null);
@@ -964,10 +963,6 @@ function ApplicantCard({ app, shift, onUpdateStatus }) {
     setLoadingProfile(false);
     setExpanded(true);
   };
-
-  const ahpraUrl = profile && profile.ahpra
-    ? "https://www.ahpra.gov.au/Registration/Registers-of-Practitioners.aspx"
-    : null;
 
   return (
     <div style={{ background:T.bgCard,border:`1px solid ${expanded?T.amber:T.border}`,borderRadius:12,padding:"20px 22px",transition:"border-color 0.2s" }}>
@@ -1017,7 +1012,6 @@ function ApplicantCard({ app, shift, onUpdateStatus }) {
         </div>
       </div>
 
-      {/* Expanded pharmacist profile */}
       {expanded && (
         <div style={{ borderTop:"1px solid " + T.border,paddingTop:16,marginTop:4 }}>
           {profile ? (
@@ -1040,8 +1034,6 @@ function ApplicantCard({ app, shift, onUpdateStatus }) {
                   );
                 })}
               </div>
-
-              {/* AHPRA section */}
               <div style={{ background: profile.ahpra_number ? "rgba(0,229,176,0.06)" : T.bg, border:"1px solid " + (profile.ahpra_number ? T.mint : T.border),borderRadius:10,padding:"14px 16px",marginBottom:12 }}>
                 <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10 }}>
                   <div>
@@ -1067,7 +1059,7 @@ function ApplicantCard({ app, shift, onUpdateStatus }) {
                 </div>
               </div>
               <div style={{ fontSize:11,color:T.dimmer,lineHeight:1.6 }}>
-                ⚠ It is your responsibility as the pharmacy owner to verify AHPRA registration before engaging this pharmacist. Click "Verify on AHPRA" to check their registration status on the official AHPRA website.
+                ⚠ It is your responsibility as the pharmacy owner to verify AHPRA registration before engaging this pharmacist.
               </div>
             </div>
           ) : (
@@ -1137,9 +1129,7 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
         <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
           {apps.map((app,i) => {
             const shift = myShifts.find(s => s.id === app.shift_id);
-            return (
-              <ApplicantCard key={i} app={app} shift={shift} onUpdateStatus={updateStatus} />
-            );
+            return <ApplicantCard key={i} app={app} shift={shift} onUpdateStatus={updateStatus} />;
           })}
         </div>
       )}
@@ -1174,15 +1164,11 @@ export default function App() {
         showToast("🎉 Payment confirmed! Your shift is now live.");
         window.history.replaceState({},"",window.location.pathname);
       }
-      // Restore applied shifts from localStorage
       const savedApplied = JSON.parse(localStorage.getItem("ss_applied") || "[]");
-      if (savedApplied.length > 0) {
-        setApplied(new Set(savedApplied));
-      }
+      if (savedApplied.length > 0) setApplied(new Set(savedApplied));
     } catch(e) { console.warn("Session restore error:", e); }
   },[]);
 
-  // Load shifts from Supabase
   const loadShifts = async () => {
     try {
       const res = await fetch(
@@ -1230,7 +1216,6 @@ export default function App() {
     const userId = user?.id;
     if (!userId) return;
     try {
-      // Save to Supabase using anon key (RLS policy allows open insert)
       const res = await fetch(SUPA_URL + "/rest/v1/applications", {
         method: "POST",
         headers: {
@@ -1239,33 +1224,18 @@ export default function App() {
           "Authorization": "Bearer " + SUPA_KEY,
           "Prefer": "return=representation"
         },
-        body: JSON.stringify({
-          shift_id: shiftId,
-          pharmacist_id: userId,
-          message: msg || "",
-          status: "pending"
-        })
+        body: JSON.stringify({ shift_id: shiftId, pharmacist_id: userId, message: msg || "", status: "pending" })
       });
       const result = await res.json();
-      if (!res.ok) {
-        console.warn("Apply failed:", result);
-        showToast("Error submitting application. Please try again.");
-        return;
-      }
-      // Save applied state to localStorage so it persists on refresh
+      if (!res.ok) { console.warn("Apply failed:", result); showToast("Error submitting application. Please try again."); return; }
       try {
         const appliedList = JSON.parse(localStorage.getItem("ss_applied") || "[]");
         appliedList.push(shiftId);
         localStorage.setItem("ss_applied", JSON.stringify(appliedList));
       } catch(e) {}
-      // Increment applicant count
       await fetch(SUPA_URL + "/rest/v1/rpc/increment_applicant_count", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": SUPA_KEY,
-          "Authorization": "Bearer " + SUPA_KEY
-        },
+        headers: { "Content-Type": "application/json", "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY },
         body: JSON.stringify({ shift_id_input: shiftId })
       });
     } catch(e) { console.warn("Apply error:", e); }
