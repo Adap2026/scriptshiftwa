@@ -398,20 +398,39 @@ const getDayCount = (start, end) => {
   return Math.round((e - s) / (1000*60*60*24)) + 1;
 };
 
+// FIX Bug 3: beyond 8 days charge $45 for first 8 + $6/day for each additional day
 const getBundlePrice = (days, type) => {
   const base = { Standard:9, Evening:9, Weekend:14, Emergency:19 }[type] || 9;
   if (days <= 1) return `$${base} AUD`;
   if (days <= 3) return `$20 AUD`;
   if (days <= 5) return `$30 AUD`;
-  return `$45 AUD`;
+  if (days <= 8) return `$45 AUD`;
+  const extra = days - 8;
+  return `$${45 + extra * 6} AUD`;
 };
 
 const getSaving = (days, type) => {
   const base = { Standard:9, Evening:9, Weekend:14, Emergency:19 }[type] || 9;
   if (days <= 1) return 0;
   const full = days * base;
-  const discounted = days<=3?20:days<=5?30:45;
+  let discounted;
+  if (days <= 3) discounted = 20;
+  else if (days <= 5) discounted = 30;
+  else if (days <= 8) discounted = 45;
+  else discounted = 45 + (days - 8) * 6;
   return Math.max(0, full - discounted);
+};
+
+// FIX Bug 2: detect shift type from date — weekend or emergency (within 2 days)
+const detectShiftType = (dateStr) => {
+  if (!dateStr) return null;
+  const d = new Date(dateStr + "T00:00:00");
+  const day = d.getDay(); // 0=Sun, 6=Sat
+  if (day === 0 || day === 6) return "Weekend";
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diffDays = Math.round((d - today) / (1000*60*60*24));
+  if (diffDays >= 0 && diffDays <= 2) return "Emergency";
+  return null;
 };
 
 function PostView() {
@@ -424,9 +443,18 @@ function PostView() {
   });
   const [step, setStep] = useState("form");
   const [error, setError] = useState("");
+  const [typeAutoSet, setTypeAutoSet] = useState(false);
 
   const set   = k => e => setForm(p=>({...p,[k]:e.target.value}));
   const check = k => e => setForm(p=>({...p,[k]:e.target.checked}));
+
+  // FIX Bug 2: auto-detect type when start date changes
+  const handleDateFrom = e => {
+    const val = e.target.value;
+    const detected = detectShiftType(val);
+    setForm(p => ({ ...p, date_from: val, ...(detected ? { type: detected } : {}) }));
+    setTypeAutoSet(!!detected);
+  };
 
   const days    = getDayCount(form.date_from, form.date_to);
   const price   = getBundlePrice(days, form.type);
@@ -451,6 +479,7 @@ function PostView() {
     } else if (days <= 5) {
       link = BUNDLE_LINKS[5];
     } else {
+      // FIX Bug 3: all blocks >8 days also use the 8-day bundle link (Stripe handles the amount)
       link = BUNDLE_LINKS[8];
     }
     const params = new URLSearchParams({
@@ -495,7 +524,7 @@ function PostView() {
             <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14 }}>
               <div>
                 <label style={labelStyle}>Start Date *</label>
-                <input type="date" style={{...inputStyle,marginBottom:0}} value={form.date_from} onChange={set("date_from")} />
+                <input type="date" style={{...inputStyle,marginBottom:0}} value={form.date_from} onChange={handleDateFrom} />
               </div>
               <div>
                 <label style={labelStyle}>End Date <span style={{color:T.dimmer,fontWeight:400,textTransform:"none",letterSpacing:0}}>(optional)</span></label>
@@ -514,7 +543,7 @@ function PostView() {
           </div>
 
           <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14 }}>
-            <div><label style={labelStyle}>Shift Type</label><select style={inputStyle} value={form.type} onChange={set("type")}>{["Standard","Emergency","Weekend","Evening"].map(t=><option key={t}>{t}</option>)}</select></div>
+            <div><label style={labelStyle}>Shift Type {typeAutoSet && <span style={{color:T.amber,fontWeight:600,fontSize:10,letterSpacing:0,textTransform:"none",marginLeft:6}}>⚡ Auto-detected</span>}</label><select style={inputStyle} value={form.type} onChange={e=>{set("type")(e);setTypeAutoSet(false);}}>{["Standard","Emergency","Weekend","Evening"].map(t=><option key={t}>{t}</option>)}</select></div>
             <div><label style={labelStyle}>Rate ($/hr) *</label><input type="number" style={inputStyle} placeholder="85" value={form.rate} onChange={set("rate")} /></div>
           </div>
 
@@ -953,12 +982,24 @@ function ApplicantCard({ app, shift, onUpdateStatus }) {
     if (profile || loadingProfile) { setExpanded(!expanded); return; }
     setLoadingProfile(true);
     try {
+      // FIX Bug 1: use the stored session token (not anon key) so RLS allows the read
+      const token = localStorage.getItem("ss_token") || SUPA_KEY;
       const res = await fetch(
-        SUPA_URL + "/rest/v1/profiles?id=eq." + app.pharmacist_id,
-        { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY } }
+        SUPA_URL + "/rest/v1/profiles?id=eq." + app.pharmacist_id + "&select=*",
+        { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + token } }
       );
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) setProfile(data[0]);
+      if (Array.isArray(data) && data.length > 0) {
+        const p = data[0];
+        // Also merge from app.pharmacist_metadata if profile columns are missing
+        const meta = app.pharmacist_metadata || {};
+        setProfile({
+          ...p,
+          ahpra_number: p.ahpra_number || meta.ahpra_number || "",
+          phone: p.phone || meta.phone || "",
+          full_name: p.full_name || meta.full_name || "",
+        });
+      }
     } catch(e) { console.warn(e); }
     setLoadingProfile(false);
     setExpanded(true);
