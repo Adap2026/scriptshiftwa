@@ -389,7 +389,11 @@ const BUNDLE_LINKS = {
   3: "https://buy.stripe.com/9B66oA7N38Gi4e25cLa7C0d",
   5: "https://buy.stripe.com/5kQcMY8R7bSu5i6bB9a7C0a",
   8: "https://buy.stripe.com/4gM3co4AR6yacKydJha7C07",
-  perDay: "https://buy.stripe.com/aFabIU8R75u6eSGbB9a7C0e",
+  11: "https://buy.stripe.com/eVqcMY6IZf4G8ui34Da7C0f",
+  14: "https://buy.stripe.com/6oUcMYd7n3lY6maax5a7C0g",
+  17: "https://buy.stripe.com/5kQaEQd7n09M11Q20za7C0h",
+  20: "https://buy.stripe.com/7sYcMYaZf7Ce25UcFda7C0i",
+  30: "https://buy.stripe.com/fZubIU5EV8Gi7qecFda7C0j",
 };
 
 const getDayCount = (start, end) => {
@@ -484,13 +488,16 @@ function PostView() {
       link = BUNDLE_LINKS[5];
     } else if (days <= 8) {
       link = BUNDLE_LINKS[8];
+    } else if (days <= 11) {
+      link = BUNDLE_LINKS[11];
+    } else if (days <= 14) {
+      link = BUNDLE_LINKS[14];
+    } else if (days <= 17) {
+      link = BUNDLE_LINKS[17];
+    } else if (days <= 20) {
+      link = BUNDLE_LINKS[20];
     } else {
-      // 9+ days: use $6/unit perDay link, quantity = total price / 6
-      // e.g. 20 days = $45 + (12 * $6) = $117 → 117/6 = ~20 units
-      const totalPrice = 45 + (days - 8) * 6;
-      const units = Math.round(totalPrice / 6);
-      params.set("prefilled_quantity", String(units));
-      link = BUNDLE_LINKS.perDay;
+      link = BUNDLE_LINKS[30];
     }
     window.location.href = `${link}?${params}`;
   };
