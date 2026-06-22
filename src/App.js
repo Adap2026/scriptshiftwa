@@ -389,6 +389,7 @@ const BUNDLE_LINKS = {
   3: "https://buy.stripe.com/9B66oA7N38Gi4e25cLa7C0d",
   5: "https://buy.stripe.com/5kQcMY8R7bSu5i6bB9a7C0a",
   8: "https://buy.stripe.com/4gM3co4AR6yacKydJha7C07",
+  perDay: "https://buy.stripe.com/aFabIU8R75u6eSGbB9a7C0e",
 };
 
 const getDayCount = (start, end) => {
@@ -472,19 +473,25 @@ function PostView() {
 
   const handlePay = () => {
     let link;
+    const params = new URLSearchParams({
+      client_reference_id: `${form.pharmacy_name}_${form.date_from}${form.date_to?`_to_${form.date_to}`:""}`.replace(/\s+/g,"_")
+    });
     if (days <= 1) {
       link = STRIPE_PAYMENT_LINKS[form.type];
     } else if (days <= 3) {
       link = BUNDLE_LINKS[3];
     } else if (days <= 5) {
       link = BUNDLE_LINKS[5];
-    } else {
-      // FIX Bug 3: all blocks >8 days also use the 8-day bundle link (Stripe handles the amount)
+    } else if (days <= 8) {
       link = BUNDLE_LINKS[8];
+    } else {
+      // 9+ days: use $6/unit perDay link, quantity = total price / 6
+      // e.g. 20 days = $45 + (12 * $6) = $117 → 117/6 = ~20 units
+      const totalPrice = 45 + (days - 8) * 6;
+      const units = Math.round(totalPrice / 6);
+      params.set("prefilled_quantity", String(units));
+      link = BUNDLE_LINKS.perDay;
     }
-    const params = new URLSearchParams({
-      client_reference_id: `${form.pharmacy_name}_${form.date_from}${form.date_to?`_to_${form.date_to}`:""}`.replace(/\s+/g,"_")
-    });
     window.location.href = `${link}?${params}`;
   };
 
