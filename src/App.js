@@ -1140,9 +1140,14 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
     const ids = myShifts.map(s => s.id);
     const load = async () => {
       try {
+        const sessionToken = localStorage.getItem("ss_token") || SUPA_KEY;
         const res = await fetch(
-          SUPA_URL + "/rest/v1/applications?shift_id=in.(" + ids.join(",") + ")&order=created_at.desc",
-          { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY } }
+          SUPA_URL + "/rest/v1/applications?shift_id=in.(" + ids.join(",") + ")&order=created_at.desc&limit=500",
+          { headers: {
+              "apikey": SUPA_KEY,
+              "Authorization": "Bearer " + sessionToken,
+              "Range": "0-499"
+          }}
         );
         const data = await res.json();
         if (Array.isArray(data)) setApps(data);
@@ -1226,12 +1231,14 @@ export default function App() {
 
   const loadShifts = async () => {
     try {
+      const sessionToken = localStorage.getItem("ss_token") || SUPA_KEY;
+      // Fetch all shifts (active + past) so owner can see applications on expired shifts too
       const res = await fetch(
-        SUPA_URL + "/rest/v1/shifts?status=eq.active&order=shift_date.asc",
-        { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY } }
+        SUPA_URL + "/rest/v1/shifts?order=shift_date.desc&limit=500",
+        { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + sessionToken, "Range": "0-499" } }
       );
       const data = await res.json();
-      if (Array.isArray(data)) { setShifts(data); setLiveCount(data.length); }
+      if (Array.isArray(data)) { setShifts(data); setLiveCount(data.filter(s=>s.status==="active").length); }
     } catch(e) { console.warn("Shifts fetch error:", e); }
   };
 
