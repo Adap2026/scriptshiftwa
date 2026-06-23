@@ -129,7 +129,56 @@ function AuthModal({ onClose, onSuccess }) {
     setError(""); setStep(3);
   };
 
-  // ── FIX: Insert profile row into profiles table after auth user is created ──
+  const insertProfile = async (userId, token) => {
+    await fetch(`${SUPA_URL}/rest/v1/profiles`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPA_KEY,
+        // FIX Issue 2: use the real session token so RLS allows the insert
+        "Authorization": `Bearer ${token}`,
+        "Prefer": "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify({
+        id: userId,
+        full_name: form.fullName,
+        ahpra_number: form.ahpra,
+        phone: form.phone,
+        software: form.software.join(", "),
+        role: "pharmacist",
+        min_rate: form.minRate,
+        available_regions: form.regions.join(", "),
+        open_to_travel: form.openToTravel,
+        email: form.email,
+      }),
+    });
+  };
+
+  // FIX Issue 1: after email confirmation, poll for session every 3s so the
+  // app auto-logs the pharmacist in without them having to sign in again manually
+  const pollForSession = (savedForm) => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "apikey": SUPA_KEY },
+          body: JSON.stringify({ email: savedForm.email, password: savedForm.password }),
+        });
+        const data = await res.json();
+        if (data.access_token) {
+          clearInterval(interval);
+          localStorage.setItem("ss_token", data.access_token);
+          localStorage.setItem("ss_user", JSON.stringify(data.user));
+          // Now insert profile with authenticated token
+          if (data.user?.id) await insertProfile(data.user.id, data.access_token);
+          onSuccess(data);
+        }
+      } catch(e) {}
+    }, 3000);
+    // Stop polling after 10 minutes
+    setTimeout(() => clearInterval(interval), 600000);
+  };
+
   const handleSignUpFinal = async () => {
     if (form.regions.length === 0) { setError("Please select at least one region."); return; }
     setLoading(true); setError("");
@@ -139,35 +188,16 @@ function AuthModal({ onClose, onSuccess }) {
         fullName: form.fullName, ahpra: form.ahpra,
         phone: form.phone, software: form.software.join(", "),
       });
-      // Insert profile row into profiles table immediately after auth user is created
-      if (data.user?.id) {
-        await fetch(`${SUPA_URL}/rest/v1/profiles`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": SUPA_KEY,
-            "Authorization": `Bearer ${SUPA_KEY}`,
-            "Prefer": "return=minimal",
-          },
-          body: JSON.stringify({
-            id: data.user.id,
-            full_name: form.fullName,
-            ahpra_number: form.ahpra,
-            phone: form.phone,
-            software: form.software.join(", "),
-            role: "pharmacist",
-            min_rate: form.minRate,
-            available_regions: form.regions.join(", "),
-            open_to_travel: form.openToTravel,
-            email: form.email,
-          }),
-        });
-      }
       if (data.access_token) {
+        // Email confirmation not required — insert profile immediately with real token
         localStorage.setItem("ss_token", data.access_token);
         localStorage.setItem("ss_user", JSON.stringify(data.user));
+        if (data.user?.id) await insertProfile(data.user.id, data.access_token);
         onSuccess(data);
       } else {
+        // Needs email confirmation — save form and start polling for session
+        const savedForm = { email: form.email, password: form.password };
+        pollForSession(savedForm);
         onSuccess({ needsConfirmation: true, email: form.email });
       }
     } catch(e) { setError(e.message); }
@@ -1367,7 +1397,7 @@ export default function App() {
           <div style={{ background:"rgba(0,229,176,0.08)",border:`1px solid ${T.mint}`,borderRadius:12,padding:"16px 20px",marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
             <div>
               <div style={{ fontSize:14,fontWeight:700,color:T.mintText,marginBottom:4 }}>📧 Check your email</div>
-              <div style={{ fontSize:13,color:T.dim }}>We've sent a confirmation link. Click it to activate your account, then sign in.</div>
+              <div style={{ fontSize:13,color:T.dim }}>We've sent a confirmation link to your inbox. Click it to activate your account — <strong style={{color:T.white}}>this page will automatically sign you in</strong> within a few seconds of confirming. Keep this tab open.</div>
             </div>
             <button onClick={()=>setConfirmedEmail(false)} style={{ background:"none",border:"none",color:T.dim,cursor:"pointer",fontSize:18 }}>✕</button>
           </div>
