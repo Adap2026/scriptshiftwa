@@ -529,7 +529,26 @@ function PostView() {
     } else {
       link = BUNDLE_LINKS[30];
     }
-    window.location.href = `${link}?${params}`;
+    // Save shift data to localStorage so we can insert it after Stripe returns
+    try {
+      localStorage.setItem("ss_pending_shift", JSON.stringify({
+        pharmacy_name: form.pharmacy_name,
+        location: form.location,
+        region: form.region,
+        shift_date: form.date_from,
+        date_to: form.date_to || form.date_from,
+        start_time: form.start_time,
+        end_time: form.end_time,
+        rate: form.rate,
+        type: form.type,
+        software: form.software,
+        travel_paid: form.travel_paid,
+        accommodation: form.accommodation,
+        notes: form.notes,
+        status: "active",
+      }));
+    } catch(e) {}
+    window.location.href = `${link}?${params}&success_url=${encodeURIComponent(window.location.origin + "?payment=success")}`;
   };
 
   const inputStyle = { width:"100%",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 14px",fontSize:14,color:T.white,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:18 };
@@ -1251,8 +1270,39 @@ export default function App() {
       if (t && u) { setToken(t); setUser(JSON.parse(u)); }
       const params = new URLSearchParams(window.location.search);
       if (params.get("payment")==="success") {
-        showToast("🎉 Payment confirmed! Your shift is now live.");
         window.history.replaceState({},"",window.location.pathname);
+        // Retrieve and insert the pending shift saved before Stripe redirect
+        try {
+          const pending = JSON.parse(localStorage.getItem("ss_pending_shift") || "null");
+          const sessionToken = localStorage.getItem("ss_token");
+          const sessionUser = JSON.parse(localStorage.getItem("ss_user") || "null");
+          if (pending && sessionToken && sessionUser) {
+            const shiftPayload = { ...pending, owner_id: sessionUser.id };
+            const res = await fetch(SUPA_URL + "/rest/v1/shifts", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "apikey": SUPA_KEY,
+                "Authorization": "Bearer " + sessionToken,
+                "Prefer": "return=minimal",
+              },
+              body: JSON.stringify(shiftPayload),
+            });
+            if (res.ok) {
+              localStorage.removeItem("ss_pending_shift");
+              showToast("🎉 Payment confirmed! Your shift is now live.");
+            } else {
+              const err = await res.text();
+              console.warn("Shift insert failed:", err);
+              showToast("⚠ Payment received but shift save failed — please contact support.");
+            }
+          } else {
+            showToast("🎉 Payment confirmed! Your shift is now live.");
+          }
+        } catch(e) {
+          console.warn("Pending shift restore error:", e);
+          showToast("🎉 Payment confirmed!");
+        }
       }
       const savedApplied = JSON.parse(localStorage.getItem("ss_applied") || "[]");
       if (savedApplied.length > 0) setApplied(new Set(savedApplied));
