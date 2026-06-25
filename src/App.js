@@ -1285,6 +1285,7 @@ export default function App() {
   const [legalDoc, setLegalDoc] = useState(null);
 
   useEffect(()=>{
+    const init = async () => {
     try {
       const t = localStorage.getItem("ss_token");
       const u = localStorage.getItem("ss_user");
@@ -1328,6 +1329,8 @@ export default function App() {
       const savedApplied = JSON.parse(localStorage.getItem("ss_applied") || "[]");
       if (savedApplied.length > 0) setApplied(new Set(savedApplied));
     } catch(e) { console.warn("Session restore error:", e); }
+    };
+    init();
   },[]);
 
   const loadShifts = async () => {
