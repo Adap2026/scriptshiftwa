@@ -126,6 +126,10 @@ function AuthModal({ onClose, onSuccess }) {
 
   const handleSignUpStep2 = () => {
     if (!form.ahpra) { setError("AHPRA number is required for verification."); return; }
+    const ahpraPattern = /^PHA\d{10}$/;
+    if (!ahpraPattern.test(form.ahpra.trim().toUpperCase())) {
+      setError("AHPRA number must be in the format PHA followed by 10 digits (e.g. PHA0001234567)."); return;
+    }
     setError(""); setStep(3);
   };
 
@@ -142,7 +146,7 @@ function AuthModal({ onClose, onSuccess }) {
       body: JSON.stringify({
         id: userId,
         full_name: form.fullName,
-        ahpra_number: form.ahpra,
+        ahpra_number: form.ahpra.trim().toUpperCase(),
         phone: form.phone,
         software: form.software.join(", "),
         role: "pharmacist",
@@ -291,7 +295,23 @@ function AuthModal({ onClose, onSuccess }) {
               🔒 Your AHPRA number is stored securely and displayed to pharmacy owners so they can verify your registration before confirming a shift.
             </div>
             <label style={s.label}>AHPRA Registration Number *</label>
-            <input style={s.input} placeholder="PHA0001234567" value={form.ahpra} onChange={set("ahpra")} />
+            <input
+              style={{...s.input, borderColor: form.ahpra && !/^PHA\d{10}$/.test(form.ahpra.trim().toUpperCase()) ? T.coral : form.ahpra && /^PHA\d{10}$/.test(form.ahpra.trim().toUpperCase()) ? T.mint : s.input.borderColor }}
+              placeholder="PHA0001234567"
+              value={form.ahpra}
+              onChange={e => setForm(p=>({...p, ahpra: e.target.value.toUpperCase()}))}
+              maxLength={13}
+            />
+            {form.ahpra && !/^PHA\d{10}$/.test(form.ahpra.trim()) && (
+              <div style={{fontSize:12, color:T.coral, marginTop:-12, marginBottom:12}}>
+                ⚠ Must be PHA followed by exactly 10 digits
+              </div>
+            )}
+            {form.ahpra && /^PHA\d{10}$/.test(form.ahpra.trim()) && (
+              <div style={{fontSize:12, color:T.mint, marginTop:-12, marginBottom:12}}>
+                ✓ Valid AHPRA format
+              </div>
+            )}
             <label style={s.label}>Dispensing Software (select all you know)</label>
             <div style={s.chipRow}>
               {SOFTWARE_OPTIONS.map(sw=>(
@@ -546,9 +566,10 @@ function PostView() {
         accommodation: form.accommodation,
         notes: form.notes,
         status: "active",
+        payment_status: "paid",
       }));
     } catch(e) {}
-    window.location.href = `${link}?${params}&success_url=${encodeURIComponent(window.location.origin + "?payment=success")}`;
+    window.location.href = `${link}?${params}`;
   };
 
   const inputStyle = { width:"100%",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 14px",fontSize:14,color:T.white,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:18 };
