@@ -1204,6 +1204,17 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
   const [loading, setLoading] = useState(true);
 
   const myShifts = shifts.filter(s => s.owner_id === user.id);
+  // Only show applications for active shifts with future/today dates
+  const myActiveShiftIds = new Set(
+    myShifts
+      .filter(s => {
+        if (s.status !== "active") return false;
+        const endDate = new Date((s.date_to || s.shift_date) + "T00:00:00");
+        const tod = new Date(); tod.setHours(0,0,0,0);
+        return endDate >= tod;
+      })
+      .map(s => s.id)
+  );
 
   useEffect(()=>{
     if (myShifts.length === 0) { setLoading(false); return; }
@@ -1257,7 +1268,7 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
         </div>
       ) : (
         <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
-          {apps.map((app,i) => {
+          {apps.filter(app => myActiveShiftIds.has(app.shift_id)).map((app,i) => {
             const shift = myShifts.find(s => s.id === app.shift_id);
             return <ApplicantCard key={i} app={app} shift={shift} onUpdateStatus={updateStatus} />;
           })}
