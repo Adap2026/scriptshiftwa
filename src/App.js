@@ -151,7 +151,8 @@ function AuthModal({ onClose, onSuccess }) {
         software: form.software.join(", "),
         role: "pharmacist",
         min_rate: form.minRate,
-        available_regions: form.regions.join(", "),
+        available_regions: form.regions,
+        regions: form.regions.join(", "),
         open_to_travel: form.openToTravel,
         email: form.email,
       }),
@@ -1149,7 +1150,7 @@ function ApplicantCard({ app, shift, onUpdateStatus }) {
                   ["🖥 Software", profile.software || profile.skills || "Not specified"],
                   ["💰 Min Rate", profile.min_rate ? "$" + profile.min_rate + "/hr" : "Not specified"],
                   ["✈ Travel", profile.open_to_travel ? "Yes — open to travel" : "No"],
-                  ["📍 Regions", profile.available_regions || profile.regions || "Not specified"],
+                  ["📍 Regions", profile.regions || (Array.isArray(profile.available_regions) ? profile.available_regions.join(", ") : profile.available_regions) || "Not specified"],
                 ].map(function(item) {
                   return (
                     <div key={item[0]} style={{ background:T.bg,borderRadius:8,padding:"10px 12px" }}>
