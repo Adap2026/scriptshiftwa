@@ -1411,7 +1411,12 @@ export default function App() {
     showToast("Application sent — the pharmacy owner has been notified.");
   };
 
+  const today = new Date(); today.setHours(0,0,0,0);
   const filtered = shifts.filter(s=>{
+    if(s.status !== "active") return false;
+    // Hide shifts whose date has passed (use date_to if set, otherwise shift_date)
+    const endDate = new Date((s.date_to || s.shift_date) + "T00:00:00");
+    if(endDate < today) return false;
     if(regionFilter!=="All"&&s.region!==regionFilter) return false;
     if(typeFilter!=="All"&&s.type!==typeFilter) return false;
     return true;
