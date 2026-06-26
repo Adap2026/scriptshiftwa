@@ -493,9 +493,11 @@ const getSaving = (days, type) => {
 // FIX Bug 2: detect shift type from date — weekend or emergency (within 2 days)
 const detectShiftType = (dateStr) => {
   if (!dateStr) return null;
-  const d = new Date(dateStr + "T00:00:00");
-  const day = d.getDay(); // 0=Sun, 6=Sat
-  if (day === 0 || day === 6) return "Weekend";
+  // Parse date parts directly to avoid UTC timezone offset shifting the day
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const d = new Date(year, month - 1, day); // local time, no UTC conversion
+  const dayOfWeek = d.getDay(); // 0=Sun, 6=Sat
+  if (dayOfWeek === 0 || dayOfWeek === 6) return "Weekend";
   const today = new Date(); today.setHours(0,0,0,0);
   const diffDays = Math.round((d - today) / (1000*60*60*24));
   if (diffDays >= 0 && diffDays <= 2) return "Emergency";
