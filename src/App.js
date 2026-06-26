@@ -1354,47 +1354,55 @@ export default function App() {
     try {
       const t = localStorage.getItem("ss_token");
       const u = localStorage.getItem("ss_user");
-      if (t && u) { setToken(t); setUser(JSON.parse(u)); }
+      // Restore session first
+      if (t && u) {
+        setToken(t);
+        setUser(JSON.parse(u));
+      }
 
       const params = new URLSearchParams(window.location.search);
       const isPaymentSuccess = params.get("payment") === "success";
       const pending = JSON.parse(localStorage.getItem("ss_pending_shift") || "null");
-      const sessionToken = localStorage.getItem("ss_token");
-      const sessionUser = JSON.parse(localStorage.getItem("ss_user") || "null");
 
-      // Insert shift if returning from Stripe OR if there's an unsaved pending shift
-      if (pending && sessionToken && sessionUser) {
+      // Use localStorage directly — don't rely on React state which hasn't updated yet
+      if (pending && t && u) {
         try {
+          const sessionUser = JSON.parse(u);
           const shiftPayload = { ...pending, owner_id: sessionUser.id };
           const res = await fetch(SUPA_URL + "/rest/v1/shifts", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "apikey": SUPA_KEY,
-              "Authorization": "Bearer " + sessionToken,
+              "Authorization": "Bearer " + t,
               "Prefer": "return=minimal",
             },
             body: JSON.stringify(shiftPayload),
           });
           if (res.ok) {
             localStorage.removeItem("ss_pending_shift");
-            // Clear URL and show toast after successful insert
             window.history.replaceState({}, "", window.location.pathname);
-            setTimeout(() => setToast("🎉 Payment confirmed! Your shift is now live."), 500);
+            setTimeout(() => setToast("🎉 Payment confirmed! Your shift is now live."), 800);
           } else {
             const err = await res.text();
             console.warn("Shift insert failed:", err);
             if (isPaymentSuccess) {
               window.history.replaceState({}, "", window.location.pathname);
-              setTimeout(() => setToast("⚠ Payment received but shift save failed — please contact hello@scriptshiftwa.com.au"), 500);
+              setTimeout(() => setToast("⚠ Shift save failed — " + err), 800);
             }
           }
         } catch(e) {
           console.warn("Pending shift insert error:", e);
         }
+      } else if (pending && (!t || !u)) {
+        // Payment came through but user is not logged in — keep pending shift for next login
+        console.warn("Pending shift found but no session — will retry on next login");
+        if (isPaymentSuccess) {
+          window.history.replaceState({}, "", window.location.pathname);
+          setTimeout(() => setToast("⚠ Please sign in to complete your shift posting."), 800);
+        }
       } else if (isPaymentSuccess) {
         window.history.replaceState({}, "", window.location.pathname);
-        setTimeout(() => setToast("🎉 Payment confirmed!"), 500);
       }
 
       const savedApplied = JSON.parse(localStorage.getItem("ss_applied") || "[]");
@@ -1430,14 +1438,36 @@ export default function App() {
 
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(""),3500); };
 
-  const handleAuthSuccess = (data) => {
+  const handleAuthSuccess = async (data) => {
     if (data.needsConfirmation) {
       setShowAuth(false); setConfirmedEmail(true);
       showToast("📧 Check your email to confirm your account!");
       return;
     }
     setUser(data.user); setToken(data.access_token);
-    setShowAuth(false); showToast("✓ Welcome to ScriptShift WA!");
+    setShowAuth(false);
+    // Retry pending shift insert if one was saved before Stripe redirect
+    try {
+      const pending = JSON.parse(localStorage.getItem("ss_pending_shift") || "null");
+      if (pending && data.access_token && data.user?.id) {
+        const res = await fetch(SUPA_URL + "/rest/v1/shifts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPA_KEY,
+            "Authorization": "Bearer " + data.access_token,
+            "Prefer": "return=minimal",
+          },
+          body: JSON.stringify({ ...pending, owner_id: data.user.id }),
+        });
+        if (res.ok) {
+          localStorage.removeItem("ss_pending_shift");
+          showToast("🎉 Shift posted successfully!");
+          return;
+        }
+      }
+    } catch(e) { console.warn("Post-login shift insert error:", e); }
+    showToast("✓ Welcome to ScriptShift WA!");
   };
 
   const handleSignOut = async () => {
