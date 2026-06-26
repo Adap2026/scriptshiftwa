@@ -695,11 +695,33 @@ function PostView() {
               🎉 Bundle discount applied — you're saving ${saving} AUD!
             </div>
           )}
-          <div style={{ fontSize:12,color:T.dimmer,marginBottom:20 }}>🔒 Redirects to Stripe secure checkout · Australian GST applies</div>
+          <div style={{ fontSize:12,color:T.dimmer,marginBottom:16 }}>🔒 Redirects to Stripe secure checkout · Australian GST applies</div>
+          {/* Terms & Refund Policy checkbox */}
+          <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${T.border}`,borderRadius:10,padding:"14px 16px",marginBottom:20 }}>
+            <label style={{ display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer" }}>
+              <input
+                type="checkbox"
+                checked={form.termsAccepted||false}
+                onChange={e=>setForm(p=>({...p,termsAccepted:e.target.checked}))}
+                style={{ marginTop:3,accentColor:T.amber,width:16,height:16,flexShrink:0 }}
+              />
+              <span style={{ fontSize:12,color:T.dim,lineHeight:1.6 }}>
+                I have read and agree to the{" "}
+                <a href="/terms-of-service.html" target="_blank" style={{ color:T.amber,textDecoration:"underline" }}>Terms of Service</a>
+                {" "}and{" "}
+                <a href="/refund-policy.html" target="_blank" style={{ color:T.amber,textDecoration:"underline" }}>Refund Policy</a>.
+                {" "}I understand that shift posting fees are non-refundable once payment is processed, and that it is my responsibility to verify pharmacist AHPRA registration before engagement.
+              </span>
+            </label>
+          </div>
           <div style={{ display:"flex",gap:10 }}>
             <button onClick={()=>setStep("form")} style={{ flex:1,padding:"12px 0",borderRadius:8,border:`1px solid ${T.border}`,background:"transparent",color:T.dim,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>← Back</button>
-            <button onClick={handlePay} style={{ flex:2,padding:"12px 0",borderRadius:8,border:"none",background:T.stripe,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Pay {price} via Stripe →</button>
+            <button
+              onClick={()=>{ if(!form.termsAccepted){setError("Please read and accept the Terms of Service and Refund Policy to continue.");return;} setError(""); handlePay(); }}
+              style={{ flex:2,padding:"12px 0",borderRadius:8,border:"none",background:form.termsAccepted?T.stripe:"#333",color:form.termsAccepted?"#fff":"#666",fontSize:14,fontWeight:700,cursor:form.termsAccepted?"pointer":"not-allowed",fontFamily:"'Outfit',sans-serif",transition:"all 0.2s" }}
+            >Pay {price} via Stripe →</button>
           </div>
+          {error && <div style={{ marginTop:12,fontSize:13,color:T.coral }}>{error}</div>}
         </div>
       )}
     </div>
