@@ -1355,42 +1355,48 @@ export default function App() {
       const t = localStorage.getItem("ss_token");
       const u = localStorage.getItem("ss_user");
       if (t && u) { setToken(t); setUser(JSON.parse(u)); }
+
       const params = new URLSearchParams(window.location.search);
-      if (params.get("payment")==="success") {
-        window.history.replaceState({},"",window.location.pathname);
-        // Retrieve and insert the pending shift saved before Stripe redirect
+      const isPaymentSuccess = params.get("payment") === "success";
+      const pending = JSON.parse(localStorage.getItem("ss_pending_shift") || "null");
+      const sessionToken = localStorage.getItem("ss_token");
+      const sessionUser = JSON.parse(localStorage.getItem("ss_user") || "null");
+
+      // Insert shift if returning from Stripe OR if there's an unsaved pending shift
+      if (pending && sessionToken && sessionUser) {
         try {
-          const pending = JSON.parse(localStorage.getItem("ss_pending_shift") || "null");
-          const sessionToken = localStorage.getItem("ss_token");
-          const sessionUser = JSON.parse(localStorage.getItem("ss_user") || "null");
-          if (pending && sessionToken && sessionUser) {
-            const shiftPayload = { ...pending, owner_id: sessionUser.id };
-            const res = await fetch(SUPA_URL + "/rest/v1/shifts", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "apikey": SUPA_KEY,
-                "Authorization": "Bearer " + sessionToken,
-                "Prefer": "return=minimal",
-              },
-              body: JSON.stringify(shiftPayload),
-            });
-            if (res.ok) {
-              localStorage.removeItem("ss_pending_shift");
-              showToast("🎉 Payment confirmed! Your shift is now live.");
-            } else {
-              const err = await res.text();
-              console.warn("Shift insert failed:", err);
-              showToast("⚠ Payment received but shift save failed — please contact support.");
-            }
+          const shiftPayload = { ...pending, owner_id: sessionUser.id };
+          const res = await fetch(SUPA_URL + "/rest/v1/shifts", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "apikey": SUPA_KEY,
+              "Authorization": "Bearer " + sessionToken,
+              "Prefer": "return=minimal",
+            },
+            body: JSON.stringify(shiftPayload),
+          });
+          if (res.ok) {
+            localStorage.removeItem("ss_pending_shift");
+            // Clear URL and show toast after successful insert
+            window.history.replaceState({}, "", window.location.pathname);
+            setTimeout(() => setToast("🎉 Payment confirmed! Your shift is now live."), 500);
           } else {
-            showToast("🎉 Payment confirmed! Your shift is now live.");
+            const err = await res.text();
+            console.warn("Shift insert failed:", err);
+            if (isPaymentSuccess) {
+              window.history.replaceState({}, "", window.location.pathname);
+              setTimeout(() => setToast("⚠ Payment received but shift save failed — please contact hello@scriptshiftwa.com.au"), 500);
+            }
           }
         } catch(e) {
-          console.warn("Pending shift restore error:", e);
-          showToast("🎉 Payment confirmed!");
+          console.warn("Pending shift insert error:", e);
         }
+      } else if (isPaymentSuccess) {
+        window.history.replaceState({}, "", window.location.pathname);
+        setTimeout(() => setToast("🎉 Payment confirmed!"), 500);
       }
+
       const savedApplied = JSON.parse(localStorage.getItem("ss_applied") || "[]");
       if (savedApplied.length > 0) setApplied(new Set(savedApplied));
     } catch(e) { console.warn("Session restore error:", e); }
