@@ -134,29 +134,42 @@ function AuthModal({ onClose, onSuccess }) {
   };
 
   const insertProfile = async (userId, token) => {
-    await fetch(`${SUPA_URL}/rest/v1/profiles`, {
-      method: "POST",
+    const payload = {
+      id: userId,
+      full_name: form.fullName,
+      ahpra_number: form.ahpra.trim().toUpperCase(),
+      phone: form.phone,
+      software: form.software.join(", "),
+      role: "pharmacist",
+      min_rate: form.minRate,
+      regions: form.regions.join(", "),
+      open_to_travel: form.openToTravel,
+      email: form.email,
+    };
+    // First try PATCH (update existing row created by trigger)
+    const patchRes = await fetch(`${SUPA_URL}/rest/v1/profiles?id=eq.${userId}`, {
+      method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         "apikey": SUPA_KEY,
-        // FIX Issue 2: use the real session token so RLS allows the insert
         "Authorization": `Bearer ${token}`,
-        "Prefer": "resolution=merge-duplicates,return=minimal",
+        "Prefer": "return=minimal",
       },
-      body: JSON.stringify({
-        id: userId,
-        full_name: form.fullName,
-        ahpra_number: form.ahpra.trim().toUpperCase(),
-        phone: form.phone,
-        software: form.software.join(", "),
-        role: "pharmacist",
-        min_rate: form.minRate,
-        available_regions: form.regions,
-        regions: form.regions.join(", "),
-        open_to_travel: form.openToTravel,
-        email: form.email,
-      }),
+      body: JSON.stringify(payload),
     });
+    // If no row existed, insert instead
+    if (patchRes.status === 404 || patchRes.status === 406) {
+      await fetch(`${SUPA_URL}/rest/v1/profiles`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPA_KEY,
+          "Authorization": `Bearer ${token}`,
+          "Prefer": "return=minimal",
+        },
+        body: JSON.stringify(payload),
+      });
+    }
   };
 
   // FIX Issue 1: after email confirmation, poll for session every 3s so the
@@ -711,6 +724,7 @@ function ProfileView({ user, token, onSignOut }) {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Update auth user metadata
       await fetch(SUPA_URL + "/auth/v1/user", {
         method: "PUT",
         headers: {
@@ -720,9 +734,24 @@ function ProfileView({ user, token, onSignOut }) {
         },
         body: JSON.stringify({ data: form })
       });
-      await supaUpdateProfile(token, user.id, {
-        full_name: form.full_name,
-        phone: form.phone,
+      // Update ALL fields in profiles table with session token
+      await fetch(SUPA_URL + "/rest/v1/profiles?id=eq." + user.id, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPA_KEY,
+          "Authorization": "Bearer " + (token || SUPA_KEY),
+          "Prefer": "return=minimal",
+        },
+        body: JSON.stringify({
+          full_name: form.full_name,
+          phone: form.phone,
+          ahpra_number: form.ahpra_number,
+          software: form.software,
+          regions: form.regions,
+          min_rate: form.min_rate,
+          open_to_travel: form.open_to_travel,
+        }),
       });
       setSaved(true);
       setEditing(false);
