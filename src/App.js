@@ -523,7 +523,7 @@ function PostView() {
   const handleDateFrom = e => {
     const val = e.target.value;
     const detected = detectShiftType(val);
-    setForm(p => ({ ...p, date_from: val, ...(detected ? { type: detected } : {}) }));
+    setForm(p => ({ ...p, date_from: val, type: detected || "Standard" }));
     setTypeAutoSet(!!detected);
   };
 
