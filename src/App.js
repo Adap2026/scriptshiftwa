@@ -985,8 +985,8 @@ function ApplicationsView({ user, token, shifts, applied, onBrowse }) {
 
   const appsWithShifts = myApps.map(app => ({
     ...app,
-    shift: shifts.find(s => s.id === app.shift_id) || null
-  }));
+    shift: shifts.find(s => s.id === app.shift_id && s.status === "active") || null
+  })).filter(app => app.shift !== null);
 
   return (
     <div style={{ animation:"fadeUp 0.3s ease" }}>
@@ -1003,7 +1003,7 @@ function ApplicationsView({ user, token, shifts, applied, onBrowse }) {
         </div>
       ) : (
         <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
-          {appsWithShifts.map((app,i) => (
+          {appsWithShifts.filter(app => app.shift !== null && app.shift !== undefined).map((app,i) => (
             <div key={i} style={{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"18px 20px" }}>
               <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8,marginBottom:10 }}>
                 <div>
@@ -1587,7 +1587,7 @@ export default function App() {
   const NAV = [
     {k:"browse",l:"Browse Shifts"},
     {k:"post",  l:"Post a Shift"},
-    {k:"applied",l:`Applications${applied.size?` (${applied.size})`:""}` },
+    {k:"applied",l:`Applications${applied.size ? ` (${[...applied].filter(id => shifts.some(s => s.id === id && s.status === "active")).length || ""})` : ""}` },
     {k:"profile",l: user ? (user.user_metadata?.full_name?.split(" ")[0]||"Profile") : "Sign In"},
   ];
 
