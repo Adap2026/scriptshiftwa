@@ -543,9 +543,36 @@ function PostView() {
 
   const handlePay = () => {
     let link;
-    const params = new URLSearchParams({
-      client_reference_id: `${form.pharmacy_name}_${form.date_from}${form.date_to?`_to_${form.date_to}`:""}`.replace(/\s+/g,"_")
-    });
+    const sessionUser = JSON.parse(localStorage.getItem("ss_user") || "null");
+
+    // Encode full shift data as base64 JSON for the Stripe webhook to use
+    const shiftPayload = {
+      owner_id: sessionUser?.id || "",
+      pharmacy_name: form.pharmacy_name,
+      location: form.location,
+      region: form.region,
+      shift_date: form.date_from,
+      date_to: form.date_to || form.date_from,
+      start_time: form.start_time,
+      end_time: form.end_time,
+      rate: form.rate,
+      type: form.type,
+      software: form.software,
+      travel_paid: form.travel_paid,
+      accommodation: form.accommodation,
+      notes: form.notes,
+      status: "active",
+      payment_status: "paid",
+    };
+
+    // Save to localStorage as fallback
+    try { localStorage.setItem("ss_pending_shift", JSON.stringify(shiftPayload)); } catch(e) {}
+
+    // Encode as base64 for client_reference_id (max 200 chars — use shortened version)
+    const refId = btoa(JSON.stringify(shiftPayload)).slice(0, 200);
+
+    const params = new URLSearchParams({ client_reference_id: refId });
+
     if (days <= 1) {
       link = STRIPE_PAYMENT_LINKS[form.type];
     } else if (days <= 3) {
@@ -565,26 +592,6 @@ function PostView() {
     } else {
       link = BUNDLE_LINKS[30];
     }
-    // Save shift data to localStorage so we can insert it after Stripe returns
-    try {
-      localStorage.setItem("ss_pending_shift", JSON.stringify({
-        pharmacy_name: form.pharmacy_name,
-        location: form.location,
-        region: form.region,
-        shift_date: form.date_from,
-        date_to: form.date_to || form.date_from,
-        start_time: form.start_time,
-        end_time: form.end_time,
-        rate: form.rate,
-        type: form.type,
-        software: form.software,
-        travel_paid: form.travel_paid,
-        accommodation: form.accommodation,
-        notes: form.notes,
-        status: "active",
-        payment_status: "paid",
-      }));
-    } catch(e) {}
     window.location.href = `${link}?${params}`;
   };
 
