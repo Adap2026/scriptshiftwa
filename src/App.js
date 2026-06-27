@@ -387,7 +387,7 @@ function ShiftCard({ shift, applied, onApply, user, token, animDelay }) {
         </div>
       </div>
       <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:"7px 10px",marginBottom:14 }}>
-        {[["📅",shift.shift_date],["⏱",`${fmt12(shift.start_time)}–${fmt12(shift.end_time)}`],["💻",shift.software],["📋",`${shift.scripts_min}–${shift.scripts_max} Rx/day`]].map(([icon,val])=>(
+        {[["📅",shift.shift_date],["⏱",`${fmt12(shift.start_time)}–${fmt12(shift.end_time)}`],["💻",shift.software],shift.notes?["📋",shift.notes]:null].filter(Boolean).map(([icon,val])=>(
           <div key={val} style={{ display:"flex",alignItems:"center",gap:6,fontSize:12,color:T.dim }}>
             <span style={{fontSize:10}}>{icon}</span><span style={{color:T.white,opacity:0.75}}>{val}</span>
           </div>
