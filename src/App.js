@@ -1030,8 +1030,27 @@ function ApplicationsView({ user, token, shifts, applied, onBrowse }) {
                   "{app.message}"
                 </div>
               )}
-              <div style={{ fontSize:11,color:T.dimmer,marginTop:6 }}>
-                Applied {new Date(app.created_at).toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}
+              <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8 }}>
+                <div style={{ fontSize:11,color:T.dimmer }}>
+                  Applied {new Date(app.created_at).toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}
+                </div>
+                {(app.status === "pending" || !app.status) && (
+                  <button onClick={async () => {
+                    if (!window.confirm("Withdraw your application for this shift?")) return;
+                    try {
+                      const t = localStorage.getItem("ss_token");
+                      await fetch(SUPA_URL + "/rest/v1/applications?id=eq." + app.id, {
+                        method: "DELETE",
+                        headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + t }
+                      });
+                      setMyApps(prev => prev.filter(a => a.id !== app.id));
+                      const saved = JSON.parse(localStorage.getItem("ss_applied")||"[]");
+                      localStorage.setItem("ss_applied", JSON.stringify(saved.filter(id => id !== app.shift_id)));
+                    } catch(e) { console.warn(e); }
+                  }} style={{ fontSize:12,color:T.coral,background:"transparent",border:`1px solid ${T.coral}`,borderRadius:6,padding:"4px 12px",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:600 }}>
+                    Withdraw
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -1315,13 +1334,30 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
     } catch(e) { console.warn(e); }
   };
 
+  const closeShift = async (shiftId) => {
+    if (!window.confirm("Mark this shift as filled? It will be removed from the live board and no further applications will be accepted.")) return;
+    try {
+      await fetch(SUPA_URL + "/rest/v1/shifts?id=eq." + shiftId, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPA_KEY,
+          "Authorization": "Bearer " + (token || SUPA_KEY),
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({ status: "filled" })
+      });
+      setApps(prev => prev.filter(a => a.shift_id !== shiftId));
+    } catch(e) { console.warn(e); }
+  };
+
   return (
     <div style={{ animation:"fadeUp 0.3s ease" }}>
       <div style={{ fontFamily:"'Playfair Display',serif",fontSize:28,color:T.white,marginBottom:6 }}>Applications Received</div>
       <div style={{ fontSize:14,color:T.dim,marginBottom:28 }}>Review and respond to pharmacists who have applied for your shifts.</div>
       {loading ? (
         <div style={{ textAlign:"center",padding:"40px 0",color:T.dim }}>Loading...</div>
-      ) : apps.length === 0 ? (
+      ) : apps.filter(app => myActiveShiftIds.has(app.shift_id)).length === 0 ? (
         <div style={{ textAlign:"center",padding:"60px 20px" }}>
           <div style={{ fontSize:48,marginBottom:16,opacity:0.4 }}>📋</div>
           <div style={{ fontFamily:"'Playfair Display',serif",fontSize:22,color:T.white,marginBottom:8 }}>No applications yet</div>
@@ -1329,9 +1365,28 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
         </div>
       ) : (
         <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
-          {apps.filter(app => myActiveShiftIds.has(app.shift_id)).map((app,i) => {
-            const shift = myShifts.find(s => s.id === app.shift_id);
-            return <ApplicantCard key={i} app={app} shift={shift} onUpdateStatus={updateStatus} />;
+          {/* Group by shift and show Close Shift button per shift */}
+          {[...new Set(apps.filter(app => myActiveShiftIds.has(app.shift_id)).map(a => a.shift_id))].map(shiftId => {
+            const shift = myShifts.find(s => s.id === shiftId);
+            const shiftApps = apps.filter(a => a.shift_id === shiftId);
+            return (
+              <div key={shiftId}>
+                {shift && (
+                  <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,padding:"10px 14px",background:"rgba(255,255,255,0.03)",borderRadius:8,border:`1px solid ${T.border}` }}>
+                    <div style={{ fontSize:13,fontWeight:700,color:T.white }}>
+                      {shift.pharmacy_name} · 📅 {shift.shift_date}
+                      <span style={{ fontSize:11,color:T.dim,fontWeight:400,marginLeft:8 }}>{shiftApps.length} application{shiftApps.length!==1?"s":""}</span>
+                    </div>
+                    <button onClick={() => closeShift(shiftId)} style={{ fontSize:11,color:T.mint,background:"transparent",border:`1px solid ${T.mint}`,borderRadius:6,padding:"4px 12px",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:600 }}>
+                      ✓ Mark as Filled
+                    </button>
+                  </div>
+                )}
+                {shiftApps.map((app,i) => (
+                  <ApplicantCard key={i} app={app} shift={shift} onUpdateStatus={updateStatus} />
+                ))}
+              </div>
+            );
           })}
         </div>
       )}
@@ -1522,7 +1577,6 @@ export default function App() {
   const today = new Date(); today.setHours(0,0,0,0);
   const filtered = shifts.filter(s=>{
     if(s.status !== "active") return false;
-    // Hide shifts whose date has passed (use date_to if set, otherwise shift_date)
     const endDate = new Date((s.date_to || s.shift_date) + "T00:00:00");
     if(endDate < today) return false;
     if(regionFilter!=="All"&&s.region!==regionFilter) return false;
