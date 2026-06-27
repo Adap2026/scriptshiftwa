@@ -854,11 +854,25 @@ function ProfileView({ user, token, onSignOut }) {
               <div><label style={lblSt}>Min Rate ($/hr)</label><input style={inputSt} type="number" value={form.min_rate} onChange={set("min_rate")} placeholder="60" /></div>
             </div>
             <div style={{marginBottom:16}}>
-              <label style={lblSt}>Dispensing Software</label>
-              <select style={inputSt} value={form.software} onChange={set("software")}>
-                <option value="">Select software...</option>
-                {SOFTWARE_OPTIONS.map(s=><option key={s} value={s}>{s}</option>)}
-              </select>
+              <label style={lblSt}>Dispensing Software (select all you know)</label>
+              <div style={{ display:"flex",flexWrap:"wrap",gap:8,marginTop:6 }}>
+                {(SOFTWARE_OPTIONS.length ? SOFTWARE_OPTIONS : ["Fred Dispense","Minfos","LOTS","Corum Health","Other"]).map(sw => {
+                  const selected = (typeof form.software === "string" ? form.software.split(",").map(s=>s.trim()) : []).includes(sw);
+                  return (
+                    <div key={sw} onClick={()=>{
+                      const current = typeof form.software === "string" ? form.software.split(",").map(s=>s.trim()).filter(Boolean) : [];
+                      const updated = current.includes(sw) ? current.filter(s=>s!==sw) : [...current, sw];
+                      setForm(p=>({...p, software: updated.join(", ")}));
+                    }} style={{
+                      padding:"6px 14px",borderRadius:20,fontSize:13,fontWeight:600,cursor:"pointer",
+                      background: selected ? T.amber : "transparent",
+                      color: selected ? "#000" : T.dim,
+                      border: `1.5px solid ${selected ? T.amber : T.border}`,
+                      transition:"all 0.15s"
+                    }}>{sw}</div>
+                  );
+                })}
+              </div>
             </div>
             <div style={{marginBottom:16}}>
               <label style={lblSt}>Preferred Regions</label>
