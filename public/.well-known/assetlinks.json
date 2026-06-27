@@ -1,0 +1,9 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "au.com.scriptshiftwa.twa",
+    "sha256_cert_fingerprints":
+    ["5A:57:4C:A9:4A:65:C9:4F:AE:F1:2E:B9:17:1E:A2:1F:D6:08:CC:56:F9:44:95:D6:2E:F8:A1:9B:7F:47:1D:60"]
+  }
+}]
