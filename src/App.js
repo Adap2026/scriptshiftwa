@@ -111,7 +111,11 @@ function AuthModal({ onClose, onSuccess }) {
     setLoading(true); setError("");
     try {
       const data = await supaSignIn({ email:form.email, password:form.password });
-      try { localStorage.setItem("ss_token", data.access_token); localStorage.setItem("ss_user", JSON.stringify(data.user)); } catch(e) {}
+      try { 
+        localStorage.setItem("ss_token", data.access_token); 
+        localStorage.setItem("ss_user", JSON.stringify(data.user));
+        if (data.refresh_token) localStorage.setItem("ss_refresh_token", data.refresh_token);
+      } catch(e) {}
       onSuccess(data);
     } catch(e) { setError(e.message); }
     setLoading(false);
@@ -1521,6 +1525,10 @@ export default function App() {
       return;
     }
     setUser(data.user); setToken(data.access_token);
+    // Store refresh token for auto-refresh
+    if (data.refresh_token) {
+      try { localStorage.setItem("ss_refresh_token", data.refresh_token); } catch(e) {}
+    }
     setShowAuth(false);
     // Retry pending shift insert if one was saved before Stripe redirect
     try {
@@ -1546,9 +1554,46 @@ export default function App() {
     showToast("✓ Welcome to ScriptShift WA!");
   };
 
+  // Auto-refresh session when JWT expires
+  const refreshSession = async () => {
+    const refreshToken = localStorage.getItem("ss_refresh_token");
+    if (!refreshToken) return null;
+    try {
+      const res = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": SUPA_KEY },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      const data = await res.json();
+      if (data.access_token) {
+        localStorage.setItem("ss_token", data.access_token);
+        localStorage.setItem("ss_user", JSON.stringify(data.user));
+        if (data.refresh_token) localStorage.setItem("ss_refresh_token", data.refresh_token);
+        setToken(data.access_token);
+        setUser(data.user);
+        return data.access_token;
+      }
+    } catch(e) { console.warn("Token refresh failed:", e); }
+    return null;
+  };
+
+  // Get valid token, refreshing if expired
+  const getValidToken = async () => {
+    const t = localStorage.getItem("ss_token");
+    if (!t) return null;
+    // Try a lightweight auth check
+    try {
+      const res = await fetch(`${SUPA_URL}/auth/v1/user`, {
+        headers: { "apikey": SUPA_KEY, "Authorization": `Bearer ${t}` }
+      });
+      if (res.status === 401) return await refreshSession();
+      return t;
+    } catch(e) { return t; }
+  };
+
   const handleSignOut = async () => {
     if (token) await supaSignOut(token);
-    try { localStorage.removeItem("ss_token"); localStorage.removeItem("ss_user"); } catch(e) {}
+    try { localStorage.removeItem("ss_token"); localStorage.removeItem("ss_user"); localStorage.removeItem("ss_refresh_token"); } catch(e) {}
     setUser(null); setToken(null);
     showToast("Signed out successfully."); setView("browse");
   };
