@@ -403,7 +403,7 @@ function ShiftCard({ shift, applied, onApply, user, token, animDelay }) {
           {shift.accommodation && <span style={{ fontSize:11,fontWeight:600,padding:"3px 9px",borderRadius:6,background:"rgba(0,229,176,0.08)",color:T.mintText,border:`1px solid rgba(0,229,176,0.15)` }}>🏨 Accommodation</span>}
         </div>
       )}
-      <div style={{ fontFamily:"'Playfair Display',serif",fontWeight:700,fontSize:24,color:T.white,lineHeight:1 }}>${shift.rate}<span style={{fontSize:13,fontWeight:400,color:T.dim}}>/hr</span></div>
+      <div style={{ fontFamily:"'Playfair Display',serif",fontWeight:700,fontSize:24,color:T.white,lineHeight:1 }}><span style={{fontSize:13,fontWeight:400,color:T.dim}}>From </span>${shift.rate}<span style={{fontSize:13,fontWeight:400,color:T.dim}}>/hr</span></div>
       <div style={{ fontSize:11,color:T.dimmer,marginTop:3,marginBottom:14 }}>{shift.posted} · {shift.applicant_count} {shift.applicant_count===1?"applicant":"applicants"}</div>
       <div style={{ paddingTop:14,borderTop:`1px solid ${T.border}` }}>
         {user && user.id === shift.owner_id ? (
