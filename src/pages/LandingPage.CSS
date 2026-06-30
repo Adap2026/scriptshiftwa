@@ -1,0 +1,186 @@
+.landing-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 24px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #1a1a1a;
+}
+
+/* Hero */
+.hero {
+  text-align: center;
+  padding: 64px 0 48px;
+}
+
+.hero h1 {
+  font-size: 2.25rem;
+  line-height: 1.2;
+  margin-bottom: 16px;
+  font-weight: 700;
+}
+
+.subheading {
+  font-size: 1.125rem;
+  color: #4a4a4a;
+  max-width: 640px;
+  margin: 0 auto 32px;
+  line-height: 1.6;
+}
+
+.cta-button {
+  display: inline-block;
+  background-color: #0a6e4f;
+  color: #fff;
+  padding: 14px 28px;
+  border-radius: 6px;
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 1rem;
+  transition: background-color 0.15s ease;
+}
+
+.cta-button:hover {
+  background-color: #08573e;
+}
+
+.cta-button.secondary {
+  background-color: transparent;
+  color: #0a6e4f;
+  border: 2px solid #0a6e4f;
+  padding: 12px 26px;
+}
+
+.cta-button.secondary:hover {
+  background-color: #f0f8f5;
+}
+
+/* How it works */
+.how-it-works {
+  padding: 48px 0;
+}
+
+.how-it-works h2,
+.benefits h2,
+.coverage h2,
+.final-cta h2 {
+  font-size: 1.75rem;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px;
+}
+
+.step {
+  background: #f7f7f5;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #0a6e4f;
+  color: #fff;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.step h3 {
+  margin: 8px 0;
+  font-size: 1.1rem;
+}
+
+.step p {
+  color: #4a4a4a;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Benefits */
+.benefits {
+  padding: 48px 0;
+}
+
+.benefits-list {
+  list-style: none;
+  padding: 0;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.benefits-list li {
+  padding: 12px 0 12px 28px;
+  border-bottom: 1px solid #eaeaea;
+  position: relative;
+  line-height: 1.6;
+}
+
+.benefits-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: #0a6e4f;
+  font-weight: 700;
+}
+
+/* Coverage / trust section */
+.coverage {
+  padding: 48px 0;
+  text-align: center;
+}
+
+.coverage ul {
+  list-style: none;
+  padding: 0;
+  margin-top: 16px;
+}
+
+.coverage li {
+  margin-bottom: 8px;
+  color: #4a4a4a;
+}
+
+/* Final CTA */
+.final-cta {
+  text-align: center;
+  padding: 56px 0 80px;
+  background: #f7f7f5;
+  border-radius: 12px;
+  margin: 32px 0;
+}
+
+.final-cta p {
+  color: #4a4a4a;
+  margin-bottom: 24px;
+}
+
+.cta-group {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .hero h1 {
+    font-size: 1.65rem;
+  }
+
+  .hero {
+    padding: 40px 0 32px;
+  }
+
+  .cta-group {
+    flex-direction: column;
+    align-items: center;
+  }
+}
