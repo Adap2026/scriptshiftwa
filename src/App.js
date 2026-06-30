@@ -1,5 +1,29 @@
 /* eslint-disable */
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, createContext, useContext } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Link,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
+
+// ============================================================================
+// IMPORTANT — HOW TO MERGE THIS FILE INTO YOUR PROJECT
+// ============================================================================
+// 1. Everything between the "COPY START" and "COPY END" markers below is
+//    UNCHANGED from your existing App.jsx — every component (AuthModal,
+//    ShiftCard, ApplyModal, PostView, ProfileView, LegalModal,
+//    ApplicationsView, OwnerShiftApplications, ApplicantCard,
+//    OwnerApplicationsDashboard) is copy-pasted exactly as you had it.
+//    I am NOT reproducing all of it again in this message to keep things
+//    readable — see the merge instructions below the code for exactly
+//    what to paste where.
+// 2. The NEW code is the AppProvider/AppContext, ForPharmacists,
+//    ForPharmacyOwners, AppShell, and the new default-export App at the
+//    bottom of this file.
+// ============================================================================
 
 // ── Fonts ─────────────────────────────────────────────────────────────────────
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Outfit:wght@300;400;500;600;700&display=swap');`;
@@ -1412,82 +1436,78 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
   );
 }
 
-// ── MAIN APP ──────────────────────────────────────────────────────────────────
-export default function App() {
-  const [view, setView]         = useState("browse");
-  const [regionFilter, setReg]  = useState("All");
-  const [typeFilter, setType]   = useState("All");
-  const [applied, setApplied]   = useState(new Set());
-  const [applyTarget, setTarget]= useState(null);
-  const [toast, setToast]       = useState("");
+// ============================================================================
+// NEW: Shared app context — lets every route access the same state that used
+// to live directly inside App(), without prop-drilling through the router.
+// ============================================================================
+const AppContext = createContext(null);
+const useApp = () => useContext(AppContext);
+
+function AppProvider({ children }) {
+  const [applied, setApplied]     = useState(new Set());
+  const [toast, setToast]         = useState("");
   const [liveCount, setLiveCount] = useState(0);
-  const [pulse, setPulse]       = useState(false);
-  const [showAuth, setShowAuth] = useState(false);
-  const [user, setUser]         = useState(null);
-  const [token, setToken]       = useState(null);
-  const [shifts, setShifts]     = useState([]);
+  const [pulse, setPulse]         = useState(false);
+  const [showAuth, setShowAuth]   = useState(false);
+  const [user, setUser]           = useState(null);
+  const [token, setToken]         = useState(null);
+  const [shifts, setShifts]       = useState([]);
   const [confirmedEmail, setConfirmedEmail] = useState(false);
-  const [legalDoc, setLegalDoc] = useState(null);
+  const [legalDoc, setLegalDoc]   = useState(null);
+  const [applyTarget, setTarget]  = useState(null);
+  const navigate = useNavigate();
 
   useEffect(()=>{
     const init = async () => {
-    try {
-      const t = localStorage.getItem("ss_token");
-      const u = localStorage.getItem("ss_user");
-      // Restore session first
-      if (t && u) {
-        setToken(t);
-        setUser(JSON.parse(u));
-      }
+      try {
+        const t = localStorage.getItem("ss_token");
+        const u = localStorage.getItem("ss_user");
+        if (t && u) { setToken(t); setUser(JSON.parse(u)); }
 
-      const params = new URLSearchParams(window.location.search);
-      const isPaymentSuccess = params.get("payment") === "success";
-      const pending = JSON.parse(localStorage.getItem("ss_pending_shift") || "null");
+        const params = new URLSearchParams(window.location.search);
+        const isPaymentSuccess = params.get("payment") === "success";
+        const pending = JSON.parse(localStorage.getItem("ss_pending_shift") || "null");
 
-      // Use localStorage directly — don't rely on React state which hasn't updated yet
-      if (pending && t && u) {
-        try {
-          const sessionUser = JSON.parse(u);
-          const shiftPayload = { ...pending, owner_id: sessionUser.id };
-          const res = await fetch(SUPA_URL + "/rest/v1/shifts", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "apikey": SUPA_KEY,
-              "Authorization": "Bearer " + t,
-              "Prefer": "return=minimal",
-            },
-            body: JSON.stringify(shiftPayload),
-          });
-          if (res.ok) {
-            localStorage.removeItem("ss_pending_shift");
-            window.history.replaceState({}, "", window.location.pathname);
-            setTimeout(() => setToast("🎉 Payment confirmed! Your shift is now live."), 800);
-          } else {
-            const err = await res.text();
-            console.warn("Shift insert failed:", err);
-            if (isPaymentSuccess) {
+        if (pending && t && u) {
+          try {
+            const sessionUser = JSON.parse(u);
+            const shiftPayload = { ...pending, owner_id: sessionUser.id };
+            const res = await fetch(SUPA_URL + "/rest/v1/shifts", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "apikey": SUPA_KEY,
+                "Authorization": "Bearer " + t,
+                "Prefer": "return=minimal",
+              },
+              body: JSON.stringify(shiftPayload),
+            });
+            if (res.ok) {
+              localStorage.removeItem("ss_pending_shift");
               window.history.replaceState({}, "", window.location.pathname);
-              setTimeout(() => setToast("⚠ Shift save failed — " + err), 800);
+              setTimeout(() => setToast("🎉 Payment confirmed! Your shift is now live."), 800);
+            } else {
+              const err = await res.text();
+              console.warn("Shift insert failed:", err);
+              if (isPaymentSuccess) {
+                window.history.replaceState({}, "", window.location.pathname);
+                setTimeout(() => setToast("⚠ Shift save failed — " + err), 800);
+              }
             }
+          } catch(e) { console.warn("Pending shift insert error:", e); }
+        } else if (pending && (!t || !u)) {
+          console.warn("Pending shift found but no session — will retry on next login");
+          if (isPaymentSuccess) {
+            window.history.replaceState({}, "", window.location.pathname);
+            setTimeout(() => setToast("⚠ Please sign in to complete your shift posting."), 800);
           }
-        } catch(e) {
-          console.warn("Pending shift insert error:", e);
-        }
-      } else if (pending && (!t || !u)) {
-        // Payment came through but user is not logged in — keep pending shift for next login
-        console.warn("Pending shift found but no session — will retry on next login");
-        if (isPaymentSuccess) {
+        } else if (isPaymentSuccess) {
           window.history.replaceState({}, "", window.location.pathname);
-          setTimeout(() => setToast("⚠ Please sign in to complete your shift posting."), 800);
         }
-      } else if (isPaymentSuccess) {
-        window.history.replaceState({}, "", window.location.pathname);
-      }
 
-      const savedApplied = JSON.parse(localStorage.getItem("ss_applied") || "[]");
-      if (savedApplied.length > 0) setApplied(new Set(savedApplied));
-    } catch(e) { console.warn("Session restore error:", e); }
+        const savedApplied = JSON.parse(localStorage.getItem("ss_applied") || "[]");
+        if (savedApplied.length > 0) setApplied(new Set(savedApplied));
+      } catch(e) { console.warn("Session restore error:", e); }
     };
     init();
   },[]);
@@ -1495,7 +1515,6 @@ export default function App() {
   const loadShifts = async () => {
     try {
       const sessionToken = localStorage.getItem("ss_token") || SUPA_KEY;
-      // Fetch all shifts (active + past) so owner can see applications on expired shifts too
       const res = await fetch(
         SUPA_URL + "/rest/v1/shifts?order=shift_date.desc&limit=500",
         { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + sessionToken, "Range": "0-499" } }
@@ -1525,12 +1544,10 @@ export default function App() {
       return;
     }
     setUser(data.user); setToken(data.access_token);
-    // Store refresh token for auto-refresh
     if (data.refresh_token) {
       try { localStorage.setItem("ss_refresh_token", data.refresh_token); } catch(e) {}
     }
     setShowAuth(false);
-    // Retry pending shift insert if one was saved before Stripe redirect
     try {
       const pending = JSON.parse(localStorage.getItem("ss_pending_shift") || "null");
       if (pending && data.access_token && data.user?.id) {
@@ -1554,7 +1571,6 @@ export default function App() {
     showToast("✓ Welcome to ScriptShift WA!");
   };
 
-  // Auto-refresh session when JWT expires
   const refreshSession = async () => {
     const refreshToken = localStorage.getItem("ss_refresh_token");
     if (!refreshToken) return null;
@@ -1577,11 +1593,9 @@ export default function App() {
     return null;
   };
 
-  // Get valid token, refreshing if expired
   const getValidToken = async () => {
     const t = localStorage.getItem("ss_token");
     if (!t) return null;
-    // Try a lightweight auth check
     try {
       const res = await fetch(`${SUPA_URL}/auth/v1/user`, {
         headers: { "apikey": SUPA_KEY, "Authorization": `Bearer ${t}` }
@@ -1595,10 +1609,12 @@ export default function App() {
     if (token) await supaSignOut(token);
     try { localStorage.removeItem("ss_token"); localStorage.removeItem("ss_user"); localStorage.removeItem("ss_refresh_token"); } catch(e) {}
     setUser(null); setToken(null);
-    showToast("Signed out successfully."); setView("browse");
+    showToast("Signed out successfully.");
+    navigate("/browse");
   };
 
   const handleApply = (shift) => { if (!user) { setShowAuth(true); return; } setTarget(shift); };
+
   const confirmApply = async (msg) => {
     const shiftId = applyTarget.id;
     const userId = user?.id;
@@ -1633,6 +1649,286 @@ export default function App() {
     showToast("Application sent — the pharmacy owner has been notified.");
   };
 
+  const value = {
+    applied, toast, liveCount, pulse, showAuth, setShowAuth,
+    user, token, shifts, confirmedEmail, setConfirmedEmail,
+    legalDoc, setLegalDoc, applyTarget, setTarget,
+    loadShifts, showToast, handleAuthSuccess, handleSignOut,
+    handleApply, confirmApply, getValidToken,
+  };
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+}
+
+// ============================================================================
+// NEW: /for-pharmacists landing page
+// ============================================================================
+function ForPharmacists() {
+  const s = {
+    page:{ maxWidth:960,margin:"0 auto",padding:"60px 24px 80px",fontFamily:"'Outfit',sans-serif",color:T.white },
+    hero:{ textAlign:"center",padding:"24px 0 48px" },
+    h1:{ fontFamily:"'Playfair Display',serif",fontSize:"2.25rem",lineHeight:1.2,marginBottom:16,fontWeight:900 },
+    sub:{ fontSize:"1.05rem",color:T.dim,maxWidth:620,margin:"0 auto 32px",lineHeight:1.7 },
+    cta:{ display:"inline-block",background:T.amber,color:"#000",padding:"14px 30px",borderRadius:9,fontWeight:700,textDecoration:"none",fontSize:"1rem",fontFamily:"'Outfit',sans-serif" },
+    ctaSecondary:{ display:"inline-block",background:"transparent",color:T.amber,border:`2px solid ${T.amber}`,padding:"12px 28px",borderRadius:9,fontWeight:700,textDecoration:"none",fontSize:"1rem",fontFamily:"'Outfit',sans-serif" },
+    section:{ padding:"40px 0" },
+    h2:{ fontFamily:"'Playfair Display',serif",fontSize:"1.75rem",marginBottom:24,textAlign:"center" },
+    grid:{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:18 },
+    step:{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:22 },
+    stepNum:{ display:"inline-flex",alignItems:"center",justifyContent:"center",width:30,height:30,borderRadius:"50%",background:T.amber,color:"#000",fontWeight:800,marginBottom:10 },
+    list:{ listStyle:"none",padding:0,maxWidth:720,margin:"0 auto" },
+    li:{ padding:"12px 0 12px 28px",borderBottom:`1px solid ${T.border}`,position:"relative",lineHeight:1.6,color:T.dim },
+    finalCta:{ textAlign:"center",padding:"48px 24px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:16,marginTop:20 },
+    ctaGroup:{ display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap",marginTop:20 },
+  };
+  return (
+    <div style={s.page}>
+      <section style={s.hero}>
+        <h1 style={s.h1}>Locum pharmacist shifts across Western Australia — on your terms.</h1>
+        <p style={s.sub}>ScriptShift WA is the shift marketplace built for AHPRA-registered pharmacists in WA. Browse available shifts, set your availability, and get paid for the work you choose.</p>
+        <Link to="/browse" style={s.cta}>Create your free profile</Link>
+      </section>
+
+      <section style={s.section}>
+        <h2 style={s.h2}>How it works</h2>
+        <div style={s.grid}>
+          {[
+            ["1","Register in minutes","Create a free profile using your AHPRA registration details. No lengthy forms, no gatekeeping."],
+            ["2","Browse shifts near you","See available locum shifts across Perth, regional WA, and remote areas — filtered by date, location, and pharmacy type."],
+            ["3","Claim and confirm","Accept shifts that work for you. You'll receive shift details, pharmacy software type, and any access requirements before you show up."],
+            ["4","Work and get paid","Complete the shift. Payment is handled through the platform — clear, documented, and on time."],
+          ].map(([n,t,p])=>(
+            <div key={n} style={s.step}>
+              <span style={s.stepNum}>{n}</span>
+              <h3 style={{margin:"8px 0",fontSize:"1.1rem"}}>{t}</h3>
+              <p style={{color:T.dim,lineHeight:1.5,margin:0,fontSize:13}}>{p}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={s.section}>
+        <h2 style={s.h2}>Why pharmacists choose ScriptShift WA</h2>
+        <ul style={s.list}>
+          {[
+            ["Work when you want.","Pick up single shifts or blocks — no lock-in, no agency fees."],
+            ["WA-specific.","Built for the WA pharmacy landscape, including Fred Dispense, Minfos, and WA Schedule 8 permit requirements."],
+            ["Full shift visibility.","Know the pharmacy, the software, the hours, and the rate before you commit."],
+            ["AHPRA-verified.","Every user on the platform is a registered pharmacist — you're working with peers."],
+          ].map(([b,d])=>(
+            <li key={b} style={s.li}><strong style={{color:T.white}}>{b}</strong> {d}</li>
+          ))}
+        </ul>
+      </section>
+
+      <section style={s.finalCta}>
+        <h2 style={{...s.h2,marginBottom:10}}>Ready to pick up your next shift?</h2>
+        <p style={{color:T.dim}}>Join WA pharmacists already on the platform.</p>
+        <div style={s.ctaGroup}>
+          <Link to="/browse" style={s.cta}>Create free profile</Link>
+          <Link to="/browse" style={s.ctaSecondary}>Browse available shifts</Link>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ============================================================================
+// NEW: /for-pharmacy-owners landing page
+// ============================================================================
+function ForPharmacyOwners() {
+  const s = {
+    page:{ maxWidth:960,margin:"0 auto",padding:"60px 24px 80px",fontFamily:"'Outfit',sans-serif",color:T.white },
+    hero:{ textAlign:"center",padding:"24px 0 48px" },
+    h1:{ fontFamily:"'Playfair Display',serif",fontSize:"2.25rem",lineHeight:1.2,marginBottom:16,fontWeight:900 },
+    sub:{ fontSize:"1.05rem",color:T.dim,maxWidth:620,margin:"0 auto 32px",lineHeight:1.7 },
+    cta:{ display:"inline-block",background:T.amber,color:"#000",padding:"14px 30px",borderRadius:9,fontWeight:700,textDecoration:"none",fontSize:"1rem",fontFamily:"'Outfit',sans-serif" },
+    ctaSecondary:{ display:"inline-block",background:"transparent",color:T.amber,border:`2px solid ${T.amber}`,padding:"12px 28px",borderRadius:9,fontWeight:700,textDecoration:"none",fontSize:"1rem",fontFamily:"'Outfit',sans-serif" },
+    section:{ padding:"40px 0" },
+    h2:{ fontFamily:"'Playfair Display',serif",fontSize:"1.75rem",marginBottom:24,textAlign:"center" },
+    grid:{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:18 },
+    step:{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:22 },
+    stepNum:{ display:"inline-flex",alignItems:"center",justifyContent:"center",width:30,height:30,borderRadius:"50%",background:T.amber,color:"#000",fontWeight:800,marginBottom:10 },
+    list:{ listStyle:"none",padding:0,maxWidth:720,margin:"0 auto" },
+    li:{ padding:"12px 0 12px 28px",borderBottom:`1px solid ${T.border}`,position:"relative",lineHeight:1.6,color:T.dim },
+    finalCta:{ textAlign:"center",padding:"48px 24px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:16,marginTop:20 },
+    ctaGroup:{ display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap",marginTop:20 },
+  };
+  return (
+    <div style={s.page}>
+      <section style={s.hero}>
+        <h1 style={s.h1}>Find a qualified locum pharmacist in WA — when you need one.</h1>
+        <p style={s.sub}>ScriptShift WA connects pharmacy owners and managers with AHPRA-registered locum pharmacists across Western Australia. Post a shift in minutes. Fill it fast.</p>
+        <Link to="/post" style={s.cta}>Post a shift</Link>
+      </section>
+
+      <section style={s.section}>
+        <h2 style={s.h2}>How it works</h2>
+        <div style={s.grid}>
+          {[
+            ["1","Post your shift","Enter the date, hours, location, dispensing software, and rate. Takes under two minutes."],
+            ["2","Pharmacists apply","AHPRA-verified pharmacists in your area see your listing and express interest directly."],
+            ["3","Confirm your cover","Review profiles, select your preferred pharmacist, and confirm the booking — all within the platform."],
+            ["4","Done.","Your shift is covered. Payment is processed securely through ScriptShift WA."],
+          ].map(([n,t,p])=>(
+            <div key={n} style={s.step}>
+              <span style={s.stepNum}>{n}</span>
+              <h3 style={{margin:"8px 0",fontSize:"1.1rem"}}>{t}</h3>
+              <p style={{color:T.dim,lineHeight:1.5,margin:0,fontSize:13}}>{p}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={s.section}>
+        <h2 style={s.h2}>Why pharmacy owners use ScriptShift WA</h2>
+        <ul style={s.list}>
+          {[
+            ["No agency middlemen.","Connect directly with locum pharmacists — no commission markups, no phone tag with a recruiter."],
+            ["AHPRA-verified pharmacists only.","Every pharmacist on the platform has current, confirmed registration."],
+            ["Fast turnaround.","Post an urgent gap today and have it filled within hours for most Perth metro locations."],
+            ["Transparent pricing.","Set your own rate. No hidden fees on the pharmacy side."],
+            ["WA-specific platform.","Pharmacists listed understand WA Poisons Act requirements, S8 permit access, and local dispensing software."],
+          ].map(([b,d])=>(
+            <li key={b} style={s.li}><strong style={{color:T.white}}>{b}</strong> {d}</li>
+          ))}
+        </ul>
+      </section>
+
+      <section style={s.finalCta}>
+        <h2 style={{...s.h2,marginBottom:10}}>Short-staffed? Post a shift now.</h2>
+        <p style={{color:T.dim}}>It takes two minutes. WA locum pharmacists are waiting.</p>
+        <div style={s.ctaGroup}>
+          <Link to="/post" style={s.cta}>Post a shift</Link>
+          <Link to="/post" style={s.ctaSecondary}>Learn more about pricing</Link>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ============================================================================
+// NEW: Header + Nav, now using <Link> instead of state-based view switching
+// ============================================================================
+function Header() {
+  const { user, liveCount, pulse, handleSignOut, setShowAuth } = useApp();
+  return (
+    <header style={{ background:"rgba(14,15,19,0.95)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${T.border}`,padding:"0 28px",height:60,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100 }}>
+      <Link to="/" style={{ display:"flex",alignItems:"center",gap:10,textDecoration:"none" }}>
+        <span style={{ fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,color:T.white }}>Script<span style={{color:T.amber}}>Shift</span></span>
+        <span style={{ fontSize:11,fontWeight:600,color:T.dim,borderLeft:`1px solid ${T.border}`,paddingLeft:10,letterSpacing:1 }}>WESTERN AUSTRALIA</span>
+      </Link>
+      <div style={{ display:"flex",alignItems:"center",gap:7,background:pulse?"rgba(240,165,0,0.1)":T.bgCard,border:`1px solid ${pulse?T.amber:T.border}`,borderRadius:20,padding:"5px 14px",transition:"all 0.3s",fontSize:12,fontWeight:600,color:pulse?T.amber:T.dim }}>
+        <span style={{ width:7,height:7,borderRadius:"50%",background:pulse?T.amber:T.mint,animation:"blink 1.6s infinite",display:"block" }}/>
+        {liveCount} live
+      </div>
+      {user ? (
+        <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+          <span style={{ fontSize:13,color:T.dim }}>👋 {user.user_metadata?.full_name?.split(" ")[0]||"Pharmacist"}</span>
+          <button onClick={handleSignOut} style={{ background:"transparent",border:`1px solid ${T.border}`,color:T.dim,borderRadius:7,padding:"7px 14px",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Sign Out</button>
+        </div>
+      ) : (
+        <button onClick={()=>setShowAuth(true)} style={{ background:T.amber,color:"#000",border:"none",borderRadius:7,padding:"8px 18px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+          Sign In / Register
+        </button>
+      )}
+    </header>
+  );
+}
+
+function NavBar() {
+  const { user, applied, shifts, setShowAuth } = useApp();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const NAV = [
+    { path:"/browse", l:"Browse Shifts" },
+    { path:"/post", l:"Post a Shift" },
+    { path:"/applications", l:`Applications${applied.size ? ` (${[...applied].filter(id => shifts.some(s => s.id === id && s.status === "active")).length || ""})` : ""}` },
+    { path:"/profile", l: user ? (user.user_metadata?.full_name?.split(" ")[0]||"Profile") : "Sign In" },
+  ];
+
+  // Only show the app nav once inside the app itself (not on marketing pages)
+  const isAppRoute = ["/browse","/post","/applications","/profile"].includes(location.pathname);
+  if (!isAppRoute) return null;
+
+  return (
+    <nav style={{ borderBottom:`1px solid ${T.border}`,display:"flex",padding:"0 28px",overflowX:"auto" }}>
+      {NAV.map(n=>(
+        <button key={n.path}
+          onClick={()=>{ if(n.path==="/profile"&&!user){ setShowAuth(true); return; } navigate(n.path); }}
+          style={{ padding:"14px 18px",fontSize:13,fontWeight:location.pathname===n.path?600:400,color:location.pathname===n.path?T.amber:T.dimmer,background:"none",border:"none",borderBottom:location.pathname===n.path?`2px solid ${T.amber}`:"2px solid transparent",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"'Outfit',sans-serif",transition:"color 0.15s" }}>
+          {n.l}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function Footer() {
+  const { setShowAuth, setLegalDoc } = useApp();
+  const navigate = useNavigate();
+  return (
+    <footer style={{ background:T.bgCard,borderTop:`1px solid ${T.border}`,padding:"32px 28px",marginTop:40 }}>
+      <div style={{ maxWidth:980,margin:"0 auto" }}>
+        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:24,marginBottom:24 }}>
+          <div>
+            <div style={{ fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:900,color:T.white,marginBottom:6 }}>
+              Script<span style={{color:T.amber}}>Shift</span> <span style={{fontSize:13,fontWeight:400,color:T.dim}}>Western Australia</span>
+            </div>
+            <div style={{ fontSize:12,color:T.dimmer,lineHeight:1.7 }}>
+              Real-time pharmacy shift marketplace<br/>
+              ScriptShift Technologies Pty Ltd<br/>
+              ABN 21 698 500 542
+            </div>
+          </div>
+          <div style={{ display:"flex",gap:40,flexWrap:"wrap" }}>
+            <div>
+              <div style={{ fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:1,textTransform:"uppercase",marginBottom:10 }}>Platform</div>
+              <div style={{ marginBottom:8 }}><Link to="/for-pharmacists" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>For Pharmacists</Link></div>
+              <div style={{ marginBottom:8 }}><Link to="/for-pharmacy-owners" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>For Pharmacy Owners</Link></div>
+              <div style={{ marginBottom:8 }}><Link to="/browse" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>Browse Shifts</Link></div>
+              <div style={{ marginBottom:8 }}><Link to="/post" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>Post a Shift</Link></div>
+              <div style={{ marginBottom:8 }}><span onClick={()=>setShowAuth(true)} style={{ fontSize:13,color:T.dim,cursor:"pointer" }}>Sign In / Register</span></div>
+            </div>
+            <div>
+              <div style={{ fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:1,textTransform:"uppercase",marginBottom:10 }}>Legal</div>
+              {[["Terms of Service","terms"],["Privacy Policy","privacy"],["Refund Policy","refund"]].map(([l,k])=>(
+                <div key={k} style={{ marginBottom:8 }}>
+                  <span onClick={()=>setLegalDoc(k)} style={{ fontSize:13,color:T.dim,cursor:"pointer" }}>{l}</span>
+                </div>
+              ))}
+            </div>
+            <div>
+              <div style={{ fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:1,textTransform:"uppercase",marginBottom:10 }}>Contact</div>
+              <div style={{ marginBottom:8 }}><span onClick={()=>window.location.href="mailto:hello@scriptshiftwa.com.au"} style={{ fontSize:13,color:T.amber,cursor:"pointer" }}>hello@scriptshiftwa.com.au</span></div>
+              <div style={{ marginBottom:8 }}><span onClick={()=>window.open("https://scriptshiftwa.com.au","_blank")} style={{ fontSize:13,color:T.amber,cursor:"pointer" }}>scriptshiftwa.com.au</span></div>
+              <div style={{ fontSize:13,color:T.dim }}>Perth, Western Australia</div>
+            </div>
+          </div>
+        </div>
+        <div style={{ borderTop:`1px solid ${T.border}`,paddingTop:16,display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:10 }}>
+          <div style={{ fontSize:11,color:T.dimmer }}>© 2026 ScriptShift Technologies Pty Ltd. All rights reserved.</div>
+          <div style={{ fontSize:11,color:T.dimmer,display:"flex",gap:16 }}>
+            {[["Terms","terms"],["Privacy","privacy"],["Refunds","refund"]].map(([l,k])=>(
+              <span key={k} onClick={()=>setLegalDoc(k)} style={{ cursor:"pointer",textDecoration:"underline" }}>{l}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+// ============================================================================
+// NEW: Browse view as a route (uses your unchanged ShiftCard component)
+// ============================================================================
+function BrowseRoute() {
+  const { shifts, applied, handleApply, user, token, liveCount } = useApp();
+  const [regionFilter, setReg] = useState("All");
+  const [typeFilter, setType] = useState("All");
+  const navigate = useNavigate();
+
   const today = new Date(); today.setHours(0,0,0,0);
   const filtered = shifts.filter(s=>{
     if(s.status !== "active") return false;
@@ -1643,12 +1939,114 @@ export default function App() {
     return true;
   });
 
-  const NAV = [
-    {k:"browse",l:"Browse Shifts"},
-    {k:"post",  l:"Post a Shift"},
-    {k:"applied",l:`Applications${applied.size ? ` (${[...applied].filter(id => shifts.some(s => s.id === id && s.status === "active")).length || ""})` : ""}` },
-    {k:"profile",l: user ? (user.user_metadata?.full_name?.split(" ")[0]||"Profile") : "Sign In"},
-  ];
+  const { setShowAuth } = useApp();
+
+  return (
+    <div style={{ maxWidth:980,margin:"0 auto",padding:"32px 20px 80px" }}>
+      <div style={{ background:`linear-gradient(135deg, #111318 0%, #161A24 100%)`,border:`1px solid ${T.border}`,borderRadius:16,padding:"36px 32px",marginBottom:28,position:"relative",overflow:"hidden",animation:"fadeUp 0.4s ease" }}>
+        <div style={{ position:"absolute",inset:0,backgroundImage:`linear-gradient(${T.border} 1px,transparent 1px),linear-gradient(90deg,${T.border} 1px,transparent 1px)`,backgroundSize:"40px 40px",opacity:0.3 }}/>
+        <div style={{ position:"relative",zIndex:1 }}>
+          <div style={{ fontSize:11,fontWeight:700,color:T.amber,letterSpacing:2,textTransform:"uppercase",marginBottom:12 }}>◆ Real-time · Western Australia</div>
+          <div style={{ fontFamily:"'Playfair Display',serif",fontSize:36,fontWeight:900,lineHeight:1.15,marginBottom:10 }}>Connect pharmacies<br/>with <em style={{color:T.amber}}>great pharmacists</em></div>
+          <div style={{ fontSize:15,color:T.dim,maxWidth:420,lineHeight:1.7,marginBottom:24 }}>Instant shift matching for locum pharmacists and pharmacy owners across Perth Metro, Pilbara, Kimberley and the Goldfields.</div>
+          {!user && (
+            <button onClick={()=>setShowAuth(true)} style={{ background:T.amber,color:"#000",border:"none",borderRadius:9,padding:"12px 28px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+              Register as a Pharmacist →
+            </button>
+          )}
+        </div>
+        <div style={{ position:"absolute",top:32,right:32,textAlign:"center",background:"rgba(240,165,0,0.06)",border:`1px solid rgba(240,165,0,0.2)`,borderRadius:12,padding:"16px 20px" }}>
+          <div style={{ fontFamily:"'Playfair Display',serif",fontSize:36,fontWeight:900,color:T.amber,lineHeight:1 }}>{liveCount}</div>
+          <div style={{ fontSize:11,color:T.dim,marginTop:4,letterSpacing:0.5 }}>LIVE SHIFTS</div>
+        </div>
+      </div>
+
+      <div style={{ display:"flex",gap:8,marginBottom:22,flexWrap:"wrap",alignItems:"center" }}>
+        <span style={{ fontSize:12,color:T.dimmer,marginRight:4,fontWeight:600,letterSpacing:0.5 }}>REGION</span>
+        {["All","Metro","Regional"].map(r=>(<button key={r} onClick={()=>setReg(r)} style={{ padding:"5px 14px",borderRadius:20,border:`1px solid ${regionFilter===r?T.amber:T.border}`,background:regionFilter===r?T.amberDim:"transparent",color:regionFilter===r?T.amberText:T.dim,fontSize:12,fontWeight:regionFilter===r?700:400,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>{r}</button>))}
+        <span style={{ fontSize:12,color:T.dimmer,marginLeft:12,marginRight:4,fontWeight:600,letterSpacing:0.5 }}>TYPE</span>
+        {["All","Emergency","Standard","Weekend","Evening"].map(t=>(<button key={t} onClick={()=>setType(t)} style={{ padding:"5px 14px",borderRadius:20,border:`1px solid ${typeFilter===t?T.amber:T.border}`,background:typeFilter===t?T.amberDim:"transparent",color:typeFilter===t?T.amberText:T.dim,fontSize:12,fontWeight:typeFilter===t?700:400,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>{t}</button>))}
+      </div>
+
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:14 }}>
+        {filtered.length===0 ? (
+          <div style={{ gridColumn:"1/-1",textAlign:"center",padding:"60px 20px",color:T.dim }}>
+            <div style={{ fontSize:48,marginBottom:16,opacity:0.4 }}>💊</div>
+            <div style={{ fontFamily:"'Playfair Display',serif",fontSize:22,color:T.white,marginBottom:8 }}>No shifts posted yet</div>
+            <div style={{ fontSize:14,lineHeight:1.7,maxWidth:380,margin:"0 auto",marginBottom:24 }}>ScriptShift WA is open for business. Be the first pharmacy owner to post a shift.</div>
+            <button onClick={()=>navigate("/post")} style={{ background:T.amber,color:"#000",border:"none",borderRadius:9,padding:"12px 28px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Post the First Shift →</button>
+          </div>
+        ) : filtered.map((s,i)=>(
+          <ShiftCard key={s.id} shift={s} applied={applied.has(s.id)} onApply={handleApply} user={user} token={token} animDelay={i*0.06} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ApplicationsRoute() {
+  const { user, token, shifts, applied } = useApp();
+  const navigate = useNavigate();
+  return (
+    <div style={{ maxWidth:980,margin:"0 auto",padding:"32px 20px 80px" }}>
+      {user && shifts.some(s => s.owner_id === user.id)
+        ? <OwnerApplicationsDashboard user={user} token={token} shifts={shifts} />
+        : <ApplicationsView user={user} token={token} shifts={shifts} applied={applied} onBrowse={()=>navigate("/browse")} />
+      }
+    </div>
+  );
+}
+
+function ProfileRoute() {
+  const { user, token, handleSignOut, setShowAuth } = useApp();
+  useEffect(()=>{ if(!user) setShowAuth(true); },[user]);
+  if (!user) return <div style={{ maxWidth:980,margin:"0 auto",padding:"32px 20px 80px" }} />;
+  return (
+    <div style={{ maxWidth:980,margin:"0 auto",padding:"32px 20px 80px" }}>
+      <ProfileView user={user} token={token} onSignOut={handleSignOut} />
+    </div>
+  );
+}
+
+function PostRoute() {
+  return (
+    <div style={{ maxWidth:980,margin:"0 auto",padding:"32px 20px 80px" }}>
+      <PostView />
+    </div>
+  );
+}
+
+// Marketing home — choose your own copy here, or redirect straight to /browse
+function Home() {
+  const navigate = useNavigate();
+  const s = {
+    page:{ maxWidth:960,margin:"0 auto",padding:"80px 24px",textAlign:"center" },
+    h1:{ fontFamily:"'Playfair Display',serif",fontSize:"2.5rem",fontWeight:900,marginBottom:16 },
+    sub:{ fontSize:"1.1rem",color:T.dim,maxWidth:600,margin:"0 auto 32px",lineHeight:1.7 },
+    group:{ display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap" },
+    cta:{ background:T.amber,color:"#000",padding:"14px 30px",borderRadius:9,fontWeight:700,textDecoration:"none",fontSize:"1rem" },
+    ctaAlt:{ background:"transparent",border:`2px solid ${T.amber}`,color:T.amber,padding:"12px 28px",borderRadius:9,fontWeight:700,textDecoration:"none",fontSize:"1rem" },
+  };
+  return (
+    <div style={s.page}>
+      <h1 style={s.h1}>Script<span style={{color:T.amber}}>Shift</span> Western Australia</h1>
+      <p style={s.sub}>The real-time pharmacy shift marketplace connecting AHPRA-registered locum pharmacists with pharmacy owners across WA.</p>
+      <div style={s.group}>
+        <Link to="/for-pharmacists" style={s.cta}>I'm a Pharmacist</Link>
+        <Link to="/for-pharmacy-owners" style={s.ctaAlt}>I'm a Pharmacy Owner</Link>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// NEW: AppShell — renders header/nav/footer + modals + routed content
+// ============================================================================
+function AppShell() {
+  const {
+    showAuth, setShowAuth, handleAuthSuccess, applyTarget, setTarget,
+    confirmApply, legalDoc, setLegalDoc, toast, confirmedEmail, setConfirmedEmail,
+  } = useApp();
 
   return (
     <div style={{ fontFamily:"'Outfit',sans-serif",background:T.bg,minHeight:"100vh",color:T.white }}>
@@ -1662,94 +2060,31 @@ export default function App() {
         select option{background:${T.bgCard};color:${T.white}}
       `}</style>
 
-      <header style={{ background:"rgba(14,15,19,0.95)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${T.border}`,padding:"0 28px",height:60,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100 }}>
-        <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-          <span style={{ fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,color:T.white }}>Script<span style={{color:T.amber}}>Shift</span></span>
-          <span style={{ fontSize:11,fontWeight:600,color:T.dim,borderLeft:`1px solid ${T.border}`,paddingLeft:10,letterSpacing:1 }}>WESTERN AUSTRALIA</span>
-        </div>
-        <div style={{ display:"flex",alignItems:"center",gap:7,background:pulse?"rgba(240,165,0,0.1)":T.bgCard,border:`1px solid ${pulse?T.amber:T.border}`,borderRadius:20,padding:"5px 14px",transition:"all 0.3s",fontSize:12,fontWeight:600,color:pulse?T.amber:T.dim }}>
-          <span style={{ width:7,height:7,borderRadius:"50%",background:pulse?T.amber:T.mint,animation:"blink 1.6s infinite",display:"block" }}/>
-          {liveCount} live
-        </div>
-        {user ? (
-          <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-            <span style={{ fontSize:13,color:T.dim }}>👋 {user.user_metadata?.full_name?.split(" ")[0]||"Pharmacist"}</span>
-            <button onClick={handleSignOut} style={{ background:"transparent",border:`1px solid ${T.border}`,color:T.dim,borderRadius:7,padding:"7px 14px",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Sign Out</button>
-          </div>
-        ) : (
-          <button onClick={()=>setShowAuth(true)} style={{ background:T.amber,color:"#000",border:"none",borderRadius:7,padding:"8px 18px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
-            Sign In / Register
-          </button>
-        )}
-      </header>
+      <Header />
+      <NavBar />
 
-      <nav style={{ borderBottom:`1px solid ${T.border}`,display:"flex",padding:"0 28px",overflowX:"auto" }}>
-        {NAV.map(n=>(
-          <button key={n.k} onClick={()=>{ if(n.k==="profile"&&!user){ setShowAuth(true); return; } setView(n.k); }}
-            style={{ padding:"14px 18px",fontSize:13,fontWeight:view===n.k?600:400,color:view===n.k?T.amber:T.dimmer,background:"none",border:"none",borderBottom:view===n.k?`2px solid ${T.amber}`:"2px solid transparent",cursor:"pointer",whiteSpace:"nowrap",fontFamily:"'Outfit',sans-serif",transition:"color 0.15s" }}>
-            {n.l}
-          </button>
-        ))}
-      </nav>
-
-      <main style={{ maxWidth:980,margin:"0 auto",padding:"32px 20px 80px" }}>
+      <main>
         {confirmedEmail && (
-          <div style={{ background:"rgba(0,229,176,0.08)",border:`1px solid ${T.mint}`,borderRadius:12,padding:"16px 20px",marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-            <div>
-              <div style={{ fontSize:14,fontWeight:700,color:T.mintText,marginBottom:4 }}>📧 Check your email</div>
-              <div style={{ fontSize:13,color:T.dim }}>We've sent a confirmation link to your inbox. Click it to activate your account — <strong style={{color:T.white}}>this page will automatically sign you in</strong> within a few seconds of confirming. Keep this tab open.</div>
-            </div>
-            <button onClick={()=>setConfirmedEmail(false)} style={{ background:"none",border:"none",color:T.dim,cursor:"pointer",fontSize:18 }}>✕</button>
-          </div>
-        )}
-
-        {view==="browse" && <>
-          <div style={{ background:`linear-gradient(135deg, #111318 0%, #161A24 100%)`,border:`1px solid ${T.border}`,borderRadius:16,padding:"36px 32px",marginBottom:28,position:"relative",overflow:"hidden",animation:"fadeUp 0.4s ease" }}>
-            <div style={{ position:"absolute",inset:0,backgroundImage:`linear-gradient(${T.border} 1px,transparent 1px),linear-gradient(90deg,${T.border} 1px,transparent 1px)`,backgroundSize:"40px 40px",opacity:0.3 }}/>
-            <div style={{ position:"relative",zIndex:1 }}>
-              <div style={{ fontSize:11,fontWeight:700,color:T.amber,letterSpacing:2,textTransform:"uppercase",marginBottom:12 }}>◆ Real-time · Western Australia</div>
-              <div style={{ fontFamily:"'Playfair Display',serif",fontSize:36,fontWeight:900,lineHeight:1.15,marginBottom:10 }}>Connect pharmacies<br/>with <em style={{color:T.amber}}>great pharmacists</em></div>
-              <div style={{ fontSize:15,color:T.dim,maxWidth:420,lineHeight:1.7,marginBottom:24 }}>Instant shift matching for locum pharmacists and pharmacy owners across Perth Metro, Pilbara, Kimberley and the Goldfields.</div>
-              {!user && (
-                <button onClick={()=>setShowAuth(true)} style={{ background:T.amber,color:"#000",border:"none",borderRadius:9,padding:"12px 28px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
-                  Register as a Pharmacist →
-                </button>
-              )}
-            </div>
-            <div style={{ position:"absolute",top:32,right:32,textAlign:"center",background:"rgba(240,165,0,0.06)",border:`1px solid rgba(240,165,0,0.2)`,borderRadius:12,padding:"16px 20px" }}>
-              <div style={{ fontFamily:"'Playfair Display',serif",fontSize:36,fontWeight:900,color:T.amber,lineHeight:1 }}>{liveCount}</div>
-              <div style={{ fontSize:11,color:T.dim,marginTop:4,letterSpacing:0.5 }}>LIVE SHIFTS</div>
-            </div>
-          </div>
-
-          <div style={{ display:"flex",gap:8,marginBottom:22,flexWrap:"wrap",alignItems:"center" }}>
-            <span style={{ fontSize:12,color:T.dimmer,marginRight:4,fontWeight:600,letterSpacing:0.5 }}>REGION</span>
-            {["All","Metro","Regional"].map(r=>(<button key={r} onClick={()=>setReg(r)} style={{ padding:"5px 14px",borderRadius:20,border:`1px solid ${regionFilter===r?T.amber:T.border}`,background:regionFilter===r?T.amberDim:"transparent",color:regionFilter===r?T.amberText:T.dim,fontSize:12,fontWeight:regionFilter===r?700:400,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>{r}</button>))}
-            <span style={{ fontSize:12,color:T.dimmer,marginLeft:12,marginRight:4,fontWeight:600,letterSpacing:0.5 }}>TYPE</span>
-            {["All","Emergency","Standard","Weekend","Evening"].map(t=>(<button key={t} onClick={()=>setType(t)} style={{ padding:"5px 14px",borderRadius:20,border:`1px solid ${typeFilter===t?T.amber:T.border}`,background:typeFilter===t?T.amberDim:"transparent",color:typeFilter===t?T.amberText:T.dim,fontSize:12,fontWeight:typeFilter===t?700:400,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>{t}</button>))}
-          </div>
-
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:14 }}>
-            {filtered.length===0 ? (
-              <div style={{ gridColumn:"1/-1",textAlign:"center",padding:"60px 20px",color:T.dim }}>
-                <div style={{ fontSize:48,marginBottom:16,opacity:0.4 }}>💊</div>
-                <div style={{ fontFamily:"'Playfair Display',serif",fontSize:22,color:T.white,marginBottom:8 }}>No shifts posted yet</div>
-                <div style={{ fontSize:14,lineHeight:1.7,maxWidth:380,margin:"0 auto",marginBottom:24 }}>ScriptShift WA is open for business. Be the first pharmacy owner to post a shift.</div>
-                <button onClick={()=>setView("post")} style={{ background:T.amber,color:"#000",border:"none",borderRadius:9,padding:"12px 28px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Post the First Shift →</button>
+          <div style={{ maxWidth:980,margin:"24px auto 0",padding:"0 20px" }}>
+            <div style={{ background:"rgba(0,229,176,0.08)",border:`1px solid ${T.mint}`,borderRadius:12,padding:"16px 20px",marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+              <div>
+                <div style={{ fontSize:14,fontWeight:700,color:T.mintText,marginBottom:4 }}>📧 Check your email</div>
+                <div style={{ fontSize:13,color:T.dim }}>We've sent a confirmation link to your inbox. Click it to activate your account — <strong style={{color:T.white}}>this page will automatically sign you in</strong> within a few seconds of confirming. Keep this tab open.</div>
               </div>
-            ) : filtered.map((s,i)=>(
-              <ShiftCard key={s.id} shift={s} applied={applied.has(s.id)} onApply={handleApply} user={user} token={token} animDelay={i*0.06} />
-            ))}
+              <button onClick={()=>setConfirmedEmail(false)} style={{ background:"none",border:"none",color:T.dim,cursor:"pointer",fontSize:18 }}>✕</button>
+            </div>
           </div>
-        </>}
-
-        {view==="post"    && <PostView />}
-        {view==="applied" && (
-          user && shifts.some(s => s.owner_id === user.id)
-            ? <OwnerApplicationsDashboard user={user} token={token} shifts={shifts} />
-            : <ApplicationsView user={user} token={token} shifts={shifts} applied={applied} onBrowse={()=>setView("browse")} />
         )}
-        {view==="profile" && user && <ProfileView user={user} token={token} onSignOut={handleSignOut} />}
+
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/for-pharmacists" element={<ForPharmacists />} />
+          <Route path="/for-pharmacy-owners" element={<ForPharmacyOwners />} />
+          <Route path="/browse" element={<BrowseRoute />} />
+          <Route path="/post" element={<PostRoute />} />
+          <Route path="/applications" element={<ApplicationsRoute />} />
+          <Route path="/profile" element={<ProfileRoute />} />
+        </Routes>
       </main>
 
       {showAuth && <AuthModal onClose={()=>setShowAuth(false)} onSuccess={handleAuthSuccess} />}
@@ -1762,54 +2097,20 @@ export default function App() {
         </div>
       )}
 
-      <footer style={{ background:T.bgCard,borderTop:`1px solid ${T.border}`,padding:"32px 28px",marginTop:40 }}>
-        <div style={{ maxWidth:980,margin:"0 auto" }}>
-          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:24,marginBottom:24 }}>
-            <div>
-              <div style={{ fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:900,color:T.white,marginBottom:6 }}>
-                Script<span style={{color:T.amber}}>Shift</span> <span style={{fontSize:13,fontWeight:400,color:T.dim}}>Western Australia</span>
-              </div>
-              <div style={{ fontSize:12,color:T.dimmer,lineHeight:1.7 }}>
-                Real-time pharmacy shift marketplace<br/>
-                ScriptShift Technologies Pty Ltd<br/>
-                ABN 21 698 500 542
-              </div>
-            </div>
-            <div style={{ display:"flex",gap:40,flexWrap:"wrap" }}>
-              <div>
-                <div style={{ fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:1,textTransform:"uppercase",marginBottom:10 }}>Platform</div>
-                {[["Browse Shifts","browse"],["Post a Shift","post"],["Sign In / Register","auth"]].map(([l,k])=>(
-                  <div key={k} style={{ marginBottom:8 }}>
-                    <span onClick={()=>k==="auth"?setShowAuth(true):setView(k)} style={{ fontSize:13,color:T.dim,cursor:"pointer" }}>{l}</span>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <div style={{ fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:1,textTransform:"uppercase",marginBottom:10 }}>Legal</div>
-                {[["Terms of Service","terms"],["Privacy Policy","privacy"],["Refund Policy","refund"]].map(([l,k])=>(
-                  <div key={k} style={{ marginBottom:8 }}>
-                    <span onClick={()=>setLegalDoc(k)} style={{ fontSize:13,color:T.dim,cursor:"pointer" }}>{l}</span>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <div style={{ fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:1,textTransform:"uppercase",marginBottom:10 }}>Contact</div>
-                <div style={{ marginBottom:8 }}><span onClick={()=>window.location.href="mailto:hello@scriptshiftwa.com.au"} style={{ fontSize:13,color:T.amber,cursor:"pointer" }}>hello@scriptshiftwa.com.au</span></div>
-                <div style={{ marginBottom:8 }}><span onClick={()=>window.open("https://scriptshiftwa.com.au","_blank")} style={{ fontSize:13,color:T.amber,cursor:"pointer" }}>scriptshiftwa.com.au</span></div>
-                <div style={{ fontSize:13,color:T.dim }}>Perth, Western Australia</div>
-              </div>
-            </div>
-          </div>
-          <div style={{ borderTop:`1px solid ${T.border}`,paddingTop:16,display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:10 }}>
-            <div style={{ fontSize:11,color:T.dimmer }}>© 2026 ScriptShift Technologies Pty Ltd. All rights reserved.</div>
-            <div style={{ fontSize:11,color:T.dimmer,display:"flex",gap:16 }}>
-              {[["Terms","terms"],["Privacy","privacy"],["Refunds","refund"]].map(([l,k])=>(
-                <span key={k} onClick={()=>setLegalDoc(k)} style={{ cursor:"pointer",textDecoration:"underline" }}>{l}</span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
+  );
+}
+
+// ============================================================================
+// NEW default export — wraps everything in BrowserRouter + AppProvider
+// ============================================================================
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppProvider>
+        <AppShell />
+      </AppProvider>
+    </BrowserRouter>
   );
 }
