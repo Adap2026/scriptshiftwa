@@ -9,6 +9,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { HelmetProvider, Helmet } from "react-helmet-async";
+import BlogLocumGuide from "./pages/BlogLocumGuide";
 
 // ============================================================================
 // IMPORTANT — HOW TO MERGE THIS FILE INTO YOUR PROJECT
@@ -2096,6 +2097,7 @@ function AppShell() {
           <Route path="/" element={<Home />} />
           <Route path="/for-pharmacists" element={<ForPharmacists />} />
           <Route path="/for-pharmacy-owners" element={<ForPharmacyOwners />} />
+          <Route path="/blog/how-to-find-locum-pharmacist-work-in-wa" element={<BlogLocumGuide />} />
           <Route path="/browse" element={<BrowseRoute />} />
           <Route path="/post" element={<PostRoute />} />
           <Route path="/applications" element={<ApplicationsRoute />} />
