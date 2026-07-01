@@ -8,6 +8,7 @@ import {
   useNavigate,
   useLocation,
 } from "react-router-dom";
+import { HelmetProvider, Helmet } from "react-helmet-async";
 
 // ============================================================================
 // IMPORTANT — HOW TO MERGE THIS FILE INTO YOUR PROJECT
@@ -1682,8 +1683,13 @@ function ForPharmacists() {
     ctaGroup:{ display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap",marginTop:20 },
   };
   return (
-    <div style={s.page}>
-      <section style={s.hero}>
+  <div style={s.page}>
+    <Helmet>
+      <title>Find Locum Pharmacist Shifts in WA | ScriptShift WA</title>
+      <meta name="description" content="Browse and claim locum shifts across Western Australia. AHPRA-registered pharmacists only." />
+      <link rel="canonical" href="https://www.scriptshiftwa.com.au/for-pharmacists" />
+    </Helmet>
+    <section style={s.hero}>
         <h1 style={s.h1}>Locum pharmacist shifts across Western Australia — on your terms.</h1>
         <p style={s.sub}>ScriptShift WA is the shift marketplace built for AHPRA-registered pharmacists in WA. Browse available shifts, set your availability, and get paid for the work you choose.</p>
         <Link to="/browse" style={s.cta}>Create your free profile</Link>
@@ -1754,9 +1760,14 @@ function ForPharmacyOwners() {
     finalCta:{ textAlign:"center",padding:"48px 24px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:16,marginTop:20 },
     ctaGroup:{ display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap",marginTop:20 },
   };
-  return (
-    <div style={s.page}>
-      <section style={s.hero}>
+ return (
+  <div style={s.page}>
+    <Helmet>
+      <title>Hire a Locum Pharmacist in WA | ScriptShift WA</title>
+      <meta name="description" content="Post locum pharmacist shifts and find AHPRA-registered cover across Western Australia." />
+      <link rel="canonical" href="https://www.scriptshiftwa.com.au/for-pharmacy-owners" />
+    </Helmet>
+    <section style={s.hero}>
         <h1 style={s.h1}>Find a qualified locum pharmacist in WA — when you need one.</h1>
         <p style={s.sub}>ScriptShift WA connects pharmacy owners and managers with AHPRA-registered locum pharmacists across Western Australia. Post a shift in minutes. Fill it fast.</p>
         <Link to="/post" style={s.cta}>Post a shift</Link>
@@ -2029,6 +2040,11 @@ function Home() {
   };
   return (
     <div style={s.page}>
+    <Helmet>
+      <title>ScriptShift WA | Locum Pharmacist Shifts in Western Australia</title>
+      <meta name="description" content="ScriptShift WA connects AHPRA-registered pharmacists with pharmacy owners across Western Australia." />
+      <link rel="canonical" href="https://www.scriptshiftwa.com.au/" />
+    </Helmet>
       <h1 style={s.h1}>Script<span style={{color:T.amber}}>Shift</span> Western Australia</h1>
       <p style={s.sub}>The real-time pharmacy shift marketplace connecting AHPRA-registered locum pharmacists with pharmacy owners across WA.</p>
       <div style={s.group}>
@@ -2107,10 +2123,12 @@ function AppShell() {
 // ============================================================================
 export default function App() {
   return (
-    <BrowserRouter>
-      <AppProvider>
-        <AppShell />
-      </AppProvider>
-    </BrowserRouter>
+    <HelmetProvider>
+      <BrowserRouter>
+        <AppProvider>
+          <AppShell />
+        </AppProvider>
+      </BrowserRouter>
+    </HelmetProvider>
   );
 }
