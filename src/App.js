@@ -1703,7 +1703,7 @@ function ForPharmacists() {
             ["1","Register in minutes","Create a free profile using your AHPRA registration details. No lengthy forms, no gatekeeping."],
             ["2","Browse shifts near you","See available locum shifts across Perth, regional WA, and remote areas — filtered by date, location, and pharmacy type."],
             ["3","Claim and confirm","Accept shifts that work for you. You'll receive shift details, pharmacy software type, and any access requirements before you show up."],
-            ["4","Work and get paid","Complete the shift. Payment is handled through the platform — clear, documented, and on time."],
+            ["4","Work and get paid","Complete the shift. Payment is agreed and made directly between you and the pharmacy owner — typically paid after the shift."],
           ].map(([n,t,p])=>(
             <div key={n} style={s.step}>
               <span style={s.stepNum}>{n}</span>
@@ -1781,7 +1781,7 @@ function ForPharmacyOwners() {
             ["1","Post your shift","Enter the date, hours, location, dispensing software, and rate. Takes under two minutes."],
             ["2","Pharmacists apply","AHPRA-verified pharmacists in your area see your listing and express interest directly."],
             ["3","Confirm your cover","Review profiles, select your preferred pharmacist, and confirm the booking — all within the platform."],
-            ["4","Done.","Your shift is covered. Payment is processed securely through ScriptShift WA."],
+            ["4","Done.","Your shift is covered. Pay your locum pharmacist directly after the shift — rates are agreed upfront when posting."],
           ].map(([n,t,p])=>(
             <div key={n} style={s.step}>
               <span style={s.stepNum}>{n}</span>
