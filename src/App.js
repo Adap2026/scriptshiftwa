@@ -764,7 +764,78 @@ function PostView() {
     </div>
   );
 }
+function DeleteAccountSection({ token, onDeleted }) {
+  const [step, setStep] = useState("idle");
+  const [error, setError] = useState(null);
 
+  const handleConfirm = async () => {
+    setStep("deleting");
+    setError(null);
+    try {
+      const t = localStorage.getItem("ss_token");
+      if (!t) throw new Error("Not signed in.");
+      const res = await fetch("/api/delete-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${t}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete account.");
+      try {
+        localStorage.removeItem("ss_token");
+        localStorage.removeItem("ss_user");
+        localStorage.removeItem("ss_refresh_token");
+        localStorage.removeItem("ss_applied");
+      } catch(e) {}
+      setStep("done");
+      setTimeout(() => onDeleted(), 2000);
+    } catch(err) {
+      setError(err.message);
+      setStep("confirm");
+    }
+  };
+
+  if (step === "done") return (
+    <div style={{ background:"rgba(0,229,176,0.06)",border:`1px solid ${T.mint}`,borderRadius:8,padding:"12px 16px",marginBottom:10,fontSize:13,color:T.mintText,fontWeight:600 }}>
+      ✓ Account deleted. Redirecting…
+    </div>
+  );
+
+  return (
+    <div style={{ marginBottom:10 }}>
+      {step === "idle" && (
+        <button onClick={() => setStep("confirm")}
+          style={{ width:"100%",padding:"10px 0",borderRadius:8,border:`1px solid #3a1a1a`,background:"transparent",color:"#e05555",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+          Delete Account
+        </button>
+      )}
+      {step === "confirm" && (
+        <div style={{ background:"#1a0e0e",border:`1px solid #e05555`,borderRadius:8,padding:"14px 16px" }}>
+          <div style={{ fontSize:13,color:T.white,marginBottom:12,lineHeight:1.6 }}>
+            Permanently delete your account and all data?{" "}
+            <strong style={{ color:"#e05555" }}>This cannot be undone.</strong>
+          </div>
+          {error && <div style={{ fontSize:12,color:"#e05555",marginBottom:10 }}>⚠ {error}</div>}
+          <div style={{ display:"flex",gap:8 }}>
+            <button onClick={() => { setStep("idle"); setError(null); }}
+              style={{ flex:1,padding:"9px 0",borderRadius:7,border:`1px solid ${T.border}`,background:"transparent",color:T.dim,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+              Cancel
+            </button>
+            <button onClick={handleConfirm}
+              style={{ flex:1,padding:"9px 0",borderRadius:7,border:"none",background:"#e05555",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+              Yes, Delete
+            </button>
+          </div>
+        </div>
+      )}
+      {step === "deleting" && (
+        <div style={{ fontSize:13,color:T.dim,padding:"10px 0",textAlign:"center" }}>⏳ Deleting account…</div>
+      )}
+    </div>
+  );
+}
 // ── PROFILE VIEW ──────────────────────────────────────────────────────────────
 function ProfileView({ user, token, onSignOut }) {
   const meta = user?.user_metadata || {};
@@ -871,6 +942,7 @@ function ProfileView({ user, token, onSignOut }) {
               <div style={{ fontSize:12,fontWeight:700,color:T.amber,marginBottom:4,letterSpacing:0.5 }}>🔔 REAL-TIME ALERTS ACTIVE</div>
               <div style={{ fontSize:13,color:T.dim,lineHeight:1.6 }}>You'll be notified when new shifts match your location and software preferences.</div>
             </div>
+           <DeleteAccountSection token={token} onDeleted={onSignOut} />
             <button onClick={onSignOut} style={{ width:"100%",padding:"10px 0",borderRadius:8,border:`1px solid ${T.border}`,background:"transparent",color:T.dim,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
               Sign Out
             </button>
