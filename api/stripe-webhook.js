@@ -136,6 +136,16 @@ export default async function handler(req, res) {
     console.error("Insert error:", err);
     return res.status(500).json({ error: err.message });
   }
+  // Send native push to all registered iOS devices
+    try {
+      await sendPushToAll({
+        title: "New shift posted",
+        body: "A new locum shift is available — open ScriptShift WA to view",
+        url: "https://www.scriptshiftwa.com.au/shifts",
+      });
+    } catch (pushErr) {
+      console.error("Push send failed:", pushErr.message);
+    }
 
   // Fetch matching pharmacists and send notifications
   try {
