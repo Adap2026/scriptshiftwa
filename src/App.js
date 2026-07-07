@@ -77,9 +77,12 @@ const supaSignUp = async ({ email, password, fullName, ahpra, phone, software })
     method:"POST",
     headers:{ "Content-Type":"application/json", "apikey":SUPA_KEY },
     body: JSON.stringify({
-      email, password,
-      data:{ full_name:fullName, ahpra_number:ahpra, phone, software, role:"pharmacist" }
-    })
+  email, password,
+  options: {
+    emailRedirectTo: "https://www.scriptshiftwa.com.au/browse"
+  },
+  data:{ full_name:fullName, ahpra_number:ahpra, phone, software, role:"pharmacist" }
+})
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message || data.msg);
@@ -1514,6 +1517,29 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
 // NEW: Shared app context — lets every route access the same state that used
 // to live directly inside App(), without prop-drilling through the router.
 // ============================================================================
+const insertProfileFromMeta = async (userData, token) => {
+  const meta = userData.user_metadata || {};
+  if (!meta.ahpra_number) return;
+  const payload = {
+    id: userData.id,
+    full_name: meta.full_name || "",
+    ahpra_number: meta.ahpra_number || "",
+    phone: meta.phone || "",
+    software: meta.software || "",
+    role: "pharmacist",
+    email: userData.email,
+  };
+  await fetch(`${SUPA_URL}/rest/v1/profiles?id=eq.${userData.id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPA_KEY,
+      "Authorization": `Bearer ${token}`,
+      "Prefer": "return=minimal",
+    },
+    body: JSON.stringify(payload),
+  });
+};
 const AppContext = createContext(null);
 const useApp = () => useContext(AppContext);
 
@@ -1537,6 +1563,34 @@ function AppProvider({ children }) {
         const t = localStorage.getItem("ss_token");
         const u = localStorage.getItem("ss_user");
         if (t && u) { setToken(t); setUser(JSON.parse(u)); }
+        // Handle email confirmation redirect
+      const urlParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+      const accessToken = hashParams.get('access_token') || urlParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token') || urlParams.get('refresh_token');
+      const type = hashParams.get('type') || urlParams.get('type');
+
+      if (accessToken && type === 'signup') {
+        try {
+          // Fetch user with the confirmed token
+          const userRes = await fetch(`${SUPA_URL}/auth/v1/user`, {
+            headers: { "apikey": SUPA_KEY, "Authorization": `Bearer ${accessToken}` }
+          });
+          const userData = await userRes.json();
+          if (userData.id) {
+            localStorage.setItem("ss_token", accessToken);
+            localStorage.setItem("ss_user", JSON.stringify(userData));
+            if (refreshToken) localStorage.setItem("ss_refresh_token", refreshToken);
+            setToken(accessToken);
+            setUser(userData);
+            // Insert profile if not already done
+            await insertProfileFromMeta(userData, accessToken);
+            // Clean up URL
+            window.history.replaceState({}, "", "/browse");
+            setTimeout(() => showToast("✓ Email confirmed! Welcome to ScriptShift WA."), 500);
+          }
+        } catch(e) { console.warn("Auth callback error:", e); }
+      }
 
         const params = new URLSearchParams(window.location.search);
         const isPaymentSuccess = params.get("payment") === "success";
