@@ -1586,7 +1586,7 @@ function AppProvider({ children }) {
             // Insert profile if not already done
             await insertProfileFromMeta(userData, accessToken);
             // Clean up URL
-            window.history.replaceState({}, "", "/browse");
+            navigate("/browse");
             setTimeout(() => showToast("✓ Email confirmed! Welcome to ScriptShift WA."), 500);
           }
         } catch(e) { console.warn("Auth callback error:", e); }
@@ -1618,7 +1618,7 @@ function AppProvider({ children }) {
               const err = await res.text();
               console.warn("Shift insert failed:", err);
               if (isPaymentSuccess) {
-                window.history.replaceState({}, "", window.location.pathname);
+                navigate("/browse"); "", window.location.pathname);
                 setTimeout(() => setToast("⚠ Shift save failed — " + err), 800);
               }
             }
@@ -1696,7 +1696,8 @@ function AppProvider({ children }) {
         }
       }
     } catch(e) { console.warn("Post-login shift insert error:", e); }
-    showToast("✓ Welcome to ScriptShift WA!");
+    navigate("/browse");
+showToast("✓ Welcome to ScriptShift WA!");
   };
 
   const refreshSession = async () => {
