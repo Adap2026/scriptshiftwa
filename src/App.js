@@ -257,7 +257,7 @@ function AuthModal({ onClose, onSuccess }) {
 
   const s = {
     overlay: { position:"fixed",inset:0,background:"rgba(5,6,10,0.9)",backdropFilter:"blur(8px)",zIndex:300,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"20px 20px",overflowY:"auto" },
-    box: { background:T.bgCard,border:`1px solid ${T.borderHi}`,borderRadius:20,padding:"28px 24px",maxWidth:480,width:"100%",boxShadow:"0 32px 80px rgba(0,0,0,0.6)",animation:"fadeUp 0.3s ease",position:"relative",margin:"auto",maxHeight:"90vh",overflowY:"auto" }
+    box: { background:T.bgCard,border:`1px solid ${T.borderHi}`,borderRadius:20,padding:"28px 24px",maxWidth:480,width:"100%",boxShadow:"0 32px 80px rgba(0,0,0,0.6)",animation:"fadeUp 0.3s ease",position:"relative",margin:"auto",maxHeight:"90vh",overflowY:"auto" },
     title: { fontFamily:"'Playfair Display',serif",fontSize:24,color:T.white,marginBottom:4 },
     sub: { fontSize:14,color:T.dim,marginBottom:24,lineHeight:1.6 },
     tabs: { display:"flex",background:T.bg,borderRadius:10,padding:4,marginBottom:24,gap:4 },
