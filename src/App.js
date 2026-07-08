@@ -257,23 +257,23 @@ function AuthModal({ onClose, onSuccess }) {
 
   const s = {
     overlay: { position:"fixed",inset:0,background:"rgba(5,6,10,0.9)",backdropFilter:"blur(8px)",zIndex:300,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"20px 20px",overflowY:"auto" },
-    box: { background:T.bgCard,border:`1px solid ${T.borderHi}`,borderRadius:20,padding:"28px 24px",maxWidth:480,width:"100%",boxShadow:"0 32px 80px rgba(0,0,0,0.6)",animation:"fadeUp 0.3s ease",position:"relative",margin:"auto",maxHeight:"90vh",overflowY:"auto" },
+    box: { background:T.bgCard,border:`1px solid ${T.borderHi}`,borderRadius:20,padding:"16px 20px",maxWidth:480,width:"100%",boxShadow:"0 32px 80px rgba(0,0,0,0.6)",animation:"fadeUp 0.3s ease",position:"relative",margin:"auto",maxHeight:"90vh",overflowY:"auto" },
     title: { fontFamily:"'Playfair Display',serif",fontSize:24,color:T.white,marginBottom:4 },
-    sub: { fontSize:14,color:T.dim,marginBottom:24,lineHeight:1.6 },
-    tabs: { display:"flex",background:T.bg,borderRadius:10,padding:4,marginBottom:24,gap:4 },
+    sub: { fontSize:14,color:T.dim,marginBottom:12,lineHeight:1.6 },
+    tabs: { display:"flex",background:T.bg,borderRadius:10,padding:4,marginBottom:12,gap:4 },
     tab: (a) => ({ flex:1,padding:"8px 0",borderRadius:8,border:"none",background:a?T.bgCard:"transparent",color:a?T.white:T.dim,fontWeight:a?600:400,fontSize:14,cursor:"pointer",fontFamily:"'Outfit',sans-serif",boxShadow:a?"0 1px 4px rgba(0,0,0,0.3)":"none",transition:"all 0.15s" }),
     label: { fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:0.8,textTransform:"uppercase",display:"block",marginBottom:6 },
-    input: { width:"100%",background:T.bg,border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 14px",fontSize:14,color:T.white,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:16 },
-    err: { background:T.coralDim,border:`1px solid ${T.coral}`,borderRadius:8,padding:"10px 14px",fontSize:13,color:T.coral,marginBottom:16 },
+    input: { width:"100%",background:T.bg,border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 14px",fontSize:14,color:T.white,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:10 },
+    err: { background:T.coralDim,border:`1px solid ${T.coral}`,borderRadius:8,padding:"10px 14px",fontSize:13,color:T.coral,marginBottom:10 },
     btn: (bg) => ({ width:"100%",padding:"12px 0",borderRadius:10,border:"none",background:loading?"#4A5568":bg,color:bg===T.amber?"#000":T.white,fontSize:14,fontWeight:700,cursor:loading?"not-allowed":"pointer",fontFamily:"'Outfit',sans-serif",marginTop:4,transition:"opacity 0.15s" }),
-    stepIndicator: { display:"flex",gap:8,justifyContent:"center",marginBottom:24 },
+    stepIndicator: { display:"flex",gap:8,justifyContent:"center",marginBottom:12 },
     stepDot: (active,done) => ({ width:done?24:8,height:8,borderRadius:4,background:done?T.mint:active?T.amber:T.border,transition:"all 0.3s ease" }),
-    chipRow: { display:"flex",flexWrap:"wrap",gap:8,marginBottom:16 },
+    chipRow: { display:"flex",flexWrap:"wrap",gap:8,marginBottom:10 },
     chip: (sel) => ({ padding:"6px 14px",borderRadius:20,border:`1px solid ${sel?T.mint:T.border}`,background:sel?"rgba(0,229,176,0.1)":"transparent",color:sel?T.mintText:T.dim,fontSize:12,fontWeight:sel?700:400,cursor:"pointer",fontFamily:"'Outfit',sans-serif",transition:"all 0.15s" }),
     twoCol: { display:"grid",gridTemplateColumns:"1fr 1fr",gap:14 },
     closeBtn: { position:"absolute",top:16,right:16,background:"none",border:"none",fontSize:20,color:T.dimmer,cursor:"pointer" },
     backBtn: { background:"transparent",border:`1px solid ${T.border}`,color:T.dim,borderRadius:8,padding:"10px 0",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif",width:"100%",marginBottom:10 },
-    infoBox: { background:T.bg,borderRadius:10,padding:"12px 16px",marginBottom:16,border:`1px solid ${T.border}`,fontSize:13,color:T.dim,lineHeight:1.6 },
+    infoBox: { background:T.bg,borderRadius:10,padding:"12px 16px",marginBottom:10,border:`1px solid ${T.border}`,fontSize:13,color:T.dim,lineHeight:1.6 },
   };
 
   const SOFTWARE_OPTIONS = ["Fred Dispense","Minfos","LOTS","Corum Health","Other"];
@@ -638,7 +638,7 @@ function PostView() {
         Post a single shift or a multi-day block. Posting fee: <span style={{color:T.amberText}}>$9–$19 AUD</span> per shift, with bundle discounts for multiple days.
       </div>
 
-      <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:24 }}>
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:12 }}>
         {[["1 day","From $9"],["3 days","$20"],["5 days","$30"],["8 days","$45"]].map(([l,p])=>(
           <div key={l} style={{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 8px",textAlign:"center" }}>
             <div style={{ fontSize:13,fontWeight:700,color:T.white,marginBottom:2 }}>{l}</div>
@@ -709,7 +709,7 @@ function PostView() {
       {step==="pay" && (
         <div style={{ background:T.bgCard,borderRadius:14,padding:28,border:`1px solid ${T.border}`,animation:"fadeUp 0.3s ease" }}>
           <div style={{ fontFamily:"'Playfair Display',serif",fontSize:22,color:T.white,marginBottom:6 }}>Almost live!</div>
-          <div style={{ fontSize:14,color:T.dim,marginBottom:24,lineHeight:1.6 }}>Click below to pay securely via Stripe. Your shift{days>1?"s go":"goes"} live the moment payment is confirmed.</div>
+          <div style={{ fontSize:14,color:T.dim,marginBottom:12,lineHeight:1.6 }}>Click below to pay securely via Stripe. Your shift{days>1?"s go":"goes"} live the moment payment is confirmed.</div>
           <div style={{ background:T.bg,borderRadius:10,padding:18,marginBottom:20,border:`1px solid ${T.border}` }}>
             {[
               ["Pharmacy", form.pharmacy_name],
@@ -735,7 +735,7 @@ function PostView() {
               🎉 Bundle discount applied — you're saving ${saving} AUD!
             </div>
           )}
-          <div style={{ fontSize:12,color:T.dimmer,marginBottom:16 }}>🔒 Redirects to Stripe secure checkout · Australian GST applies</div>
+          <div style={{ fontSize:12,color:T.dimmer,marginBottom:10 }}>🔒 Redirects to Stripe secure checkout · Australian GST applies</div>
           {/* Terms & Refund Policy checkbox */}
           <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${T.border}`,borderRadius:10,padding:"14px 16px",marginBottom:20 }}>
             <label style={{ display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer" }}>
@@ -895,14 +895,14 @@ function ProfileView({ user, token, onSignOut }) {
     setSaving(false);
   };
 
-  const inputSt = { width:"100%",background:T.bg,border:`1px solid ${T.border}`,borderRadius:8,padding:"9px 14px",fontSize:14,color:T.white,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:16 };
+  const inputSt = { width:"100%",background:T.bg,border:`1px solid ${T.border}`,borderRadius:8,padding:"9px 14px",fontSize:14,color:T.white,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:10 };
   const lblSt = { fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:0.8,textTransform:"uppercase",display:"block",marginBottom:6 };
   const SOFTWARE_OPTIONS = ["Fred Dispense","Minfos","LOTS","Corum Health","Other"];
 
   return (
     <div style={{ animation:"fadeUp 0.3s ease",maxWidth:560 }}>
       {saved && (
-        <div style={{ background:T.mintDim,border:`1px solid ${T.mint}`,borderRadius:10,padding:"10px 16px",marginBottom:16,fontSize:13,color:T.mintText,fontWeight:600 }}>
+        <div style={{ background:T.mintDim,border:`1px solid ${T.mint}`,borderRadius:10,padding:"10px 16px",marginBottom:10,fontSize:13,color:T.mintText,fontWeight:600 }}>
           ✓ Profile updated successfully!
         </div>
       )}
@@ -958,7 +958,7 @@ function ProfileView({ user, token, onSignOut }) {
               <div><label style={lblSt}>AHPRA Number</label><input style={inputSt} value={form.ahpra_number} onChange={set("ahpra_number")} placeholder="PHA0001234567" /></div>
               <div><label style={lblSt}>Min Rate ($/hr)</label><input style={inputSt} type="number" value={form.min_rate} onChange={set("min_rate")} placeholder="60" /></div>
             </div>
-            <div style={{marginBottom:16}}>
+            <div style={{marginBottom:10}}>
               <label style={lblSt}>Dispensing Software (select all you know)</label>
               <div style={{ display:"flex",flexWrap:"wrap",gap:8,marginTop:6 }}>
                 {(SOFTWARE_OPTIONS.length ? SOFTWARE_OPTIONS : ["Fred Dispense","Minfos","LOTS","Corum Health","Other"]).map(sw => {
@@ -979,7 +979,7 @@ function ProfileView({ user, token, onSignOut }) {
                 })}
               </div>
             </div>
-            <div style={{marginBottom:16}}>
+            <div style={{marginBottom:10}}>
               <label style={lblSt}>Preferred Regions</label>
               <input style={inputSt} value={form.regions} onChange={set("regions")} placeholder="e.g. Perth Metro, Pilbara" />
             </div>
@@ -1115,7 +1115,7 @@ function ApplicationsView({ user, token, shifts, applied, onBrowse }) {
         <div style={{ textAlign:"center",padding:"40px 0",color:T.dim }}>Loading...</div>
       ) : appsWithShifts.length === 0 ? (
         <div style={{ textAlign:"center",padding:"60px 20px",color:T.dim }}>
-          <div style={{ fontSize:48,marginBottom:16,opacity:0.4 }}>◎</div>
+          <div style={{ fontSize:48,marginBottom:10,opacity:0.4 }}>◎</div>
           <div style={{ fontFamily:"'Playfair Display',serif",fontSize:22,color:T.white,marginBottom:8 }}>No applications yet</div>
           <div style={{ fontSize:14,color:T.dim,marginBottom:20 }}>Browse available shifts and apply to get started.</div>
           <button onClick={onBrowse} style={{ background:"transparent",border:`1.5px solid ${T.amber}`,color:T.amber,borderRadius:8,padding:"10px 28px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Browse Shifts →</button>
@@ -1478,7 +1478,7 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
         <div style={{ textAlign:"center",padding:"40px 0",color:T.dim }}>Loading...</div>
       ) : apps.filter(app => myActiveShiftIds.has(app.shift_id)).length === 0 ? (
         <div style={{ textAlign:"center",padding:"60px 20px" }}>
-          <div style={{ fontSize:48,marginBottom:16,opacity:0.4 }}>📋</div>
+          <div style={{ fontSize:48,marginBottom:10,opacity:0.4 }}>📋</div>
           <div style={{ fontFamily:"'Playfair Display',serif",fontSize:22,color:T.white,marginBottom:8 }}>No applications yet</div>
           <div style={{ fontSize:14,color:T.dim }}>Applications will appear here when pharmacists apply for your shifts.</div>
         </div>
@@ -1795,12 +1795,12 @@ function ForPharmacists() {
   const s = {
     page:{ maxWidth:960,margin:"0 auto",padding:"60px 24px 80px",fontFamily:"'Outfit',sans-serif",color:T.white },
     hero:{ textAlign:"center",padding:"24px 0 48px" },
-    h1:{ fontFamily:"'Playfair Display',serif",fontSize:"2.25rem",lineHeight:1.2,marginBottom:16,fontWeight:900 },
+    h1:{ fontFamily:"'Playfair Display',serif",fontSize:"2.25rem",lineHeight:1.2,marginBottom:10,fontWeight:900 },
     sub:{ fontSize:"1.05rem",color:T.dim,maxWidth:620,margin:"0 auto 32px",lineHeight:1.7 },
     cta:{ display:"inline-block",background:T.amber,color:"#000",padding:"14px 30px",borderRadius:9,fontWeight:700,textDecoration:"none",fontSize:"1rem",fontFamily:"'Outfit',sans-serif" },
     ctaSecondary:{ display:"inline-block",background:"transparent",color:T.amber,border:`2px solid ${T.amber}`,padding:"12px 28px",borderRadius:9,fontWeight:700,textDecoration:"none",fontSize:"1rem",fontFamily:"'Outfit',sans-serif" },
     section:{ padding:"40px 0" },
-    h2:{ fontFamily:"'Playfair Display',serif",fontSize:"1.75rem",marginBottom:24,textAlign:"center" },
+    h2:{ fontFamily:"'Playfair Display',serif",fontSize:"1.75rem",marginBottom:12,textAlign:"center" },
     grid:{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:18 },
     step:{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:22 },
     stepNum:{ display:"inline-flex",alignItems:"center",justifyContent:"center",width:30,height:30,borderRadius:"50%",background:T.amber,color:"#000",fontWeight:800,marginBottom:10 },
@@ -1873,12 +1873,12 @@ function ForPharmacyOwners() {
   const s = {
     page:{ maxWidth:960,margin:"0 auto",padding:"60px 24px 80px",fontFamily:"'Outfit',sans-serif",color:T.white },
     hero:{ textAlign:"center",padding:"24px 0 48px" },
-    h1:{ fontFamily:"'Playfair Display',serif",fontSize:"2.25rem",lineHeight:1.2,marginBottom:16,fontWeight:900 },
+    h1:{ fontFamily:"'Playfair Display',serif",fontSize:"2.25rem",lineHeight:1.2,marginBottom:10,fontWeight:900 },
     sub:{ fontSize:"1.05rem",color:T.dim,maxWidth:620,margin:"0 auto 32px",lineHeight:1.7 },
     cta:{ display:"inline-block",background:T.amber,color:"#000",padding:"14px 30px",borderRadius:9,fontWeight:700,textDecoration:"none",fontSize:"1rem",fontFamily:"'Outfit',sans-serif" },
     ctaSecondary:{ display:"inline-block",background:"transparent",color:T.amber,border:`2px solid ${T.amber}`,padding:"12px 28px",borderRadius:9,fontWeight:700,textDecoration:"none",fontSize:"1rem",fontFamily:"'Outfit',sans-serif" },
     section:{ padding:"40px 0" },
-    h2:{ fontFamily:"'Playfair Display',serif",fontSize:"1.75rem",marginBottom:24,textAlign:"center" },
+    h2:{ fontFamily:"'Playfair Display',serif",fontSize:"1.75rem",marginBottom:12,textAlign:"center" },
     grid:{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:18 },
     step:{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:22 },
     stepNum:{ display:"inline-flex",alignItems:"center",justifyContent:"center",width:30,height:30,borderRadius:"50%",background:T.amber,color:"#000",fontWeight:800,marginBottom:10 },
@@ -2009,7 +2009,7 @@ function Footer() {
   return (
     <footer style={{ background:T.bgCard,borderTop:`1px solid ${T.border}`,padding:"32px 28px",marginTop:40 }}>
       <div style={{ maxWidth:980,margin:"0 auto" }}>
-        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:24,marginBottom:24 }}>
+        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:24,marginBottom:12 }}>
           <div>
             <div style={{ fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:900,color:T.white,marginBottom:6 }}>
               Script<span style={{color:T.amber}}>Shift</span> <span style={{fontSize:13,fontWeight:400,color:T.dim}}>Western Australia</span>
@@ -2086,7 +2086,7 @@ function BrowseRoute() {
         <div style={{ position:"relative",zIndex:1 }}>
           <div style={{ fontSize:11,fontWeight:700,color:T.amber,letterSpacing:2,textTransform:"uppercase",marginBottom:12 }}>◆ Real-time · Western Australia</div>
           <div style={{ fontFamily:"'Playfair Display',serif",fontSize:36,fontWeight:900,lineHeight:1.15,marginBottom:10 }}>Connect pharmacies<br/>with <em style={{color:T.amber}}>great pharmacists</em></div>
-          <div style={{ fontSize:15,color:T.dim,maxWidth:420,lineHeight:1.7,marginBottom:24 }}>Instant shift matching for locum pharmacists and pharmacy owners across Perth Metro, Pilbara, Kimberley and the Goldfields.</div>
+          <div style={{ fontSize:15,color:T.dim,maxWidth:420,lineHeight:1.7,marginBottom:12 }}>Instant shift matching for locum pharmacists and pharmacy owners across Perth Metro, Pilbara, Kimberley and the Goldfields.</div>
           {!user && (
             <button onClick={()=>setShowAuth(true)} style={{ background:T.amber,color:"#000",border:"none",borderRadius:9,padding:"12px 28px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
               Register as a Pharmacist →
@@ -2109,9 +2109,9 @@ function BrowseRoute() {
       <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:14 }}>
         {filtered.length===0 ? (
           <div style={{ gridColumn:"1/-1",textAlign:"center",padding:"60px 20px",color:T.dim }}>
-            <div style={{ fontSize:48,marginBottom:16,opacity:0.4 }}>💊</div>
+            <div style={{ fontSize:48,marginBottom:10,opacity:0.4 }}>💊</div>
             <div style={{ fontFamily:"'Playfair Display',serif",fontSize:22,color:T.white,marginBottom:8 }}>No shifts posted yet</div>
-            <div style={{ fontSize:14,lineHeight:1.7,maxWidth:380,margin:"0 auto",marginBottom:24 }}>ScriptShift WA is open for business. Be the first pharmacy owner to post a shift.</div>
+            <div style={{ fontSize:14,lineHeight:1.7,maxWidth:380,margin:"0 auto",marginBottom:12 }}>ScriptShift WA is open for business. Be the first pharmacy owner to post a shift.</div>
             <button onClick={()=>navigate("/post")} style={{ background:T.amber,color:"#000",border:"none",borderRadius:9,padding:"12px 28px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Post the First Shift →</button>
           </div>
         ) : filtered.map((s,i)=>(
@@ -2159,7 +2159,7 @@ function Home() {
   const navigate = useNavigate();
   const s = {
     page:{ maxWidth:960,margin:"0 auto",padding:"80px 24px",textAlign:"center" },
-    h1:{ fontFamily:"'Playfair Display',serif",fontSize:"2.5rem",fontWeight:900,marginBottom:16 },
+    h1:{ fontFamily:"'Playfair Display',serif",fontSize:"2.5rem",fontWeight:900,marginBottom:10 },
     sub:{ fontSize:"1.1rem",color:T.dim,maxWidth:600,margin:"0 auto 32px",lineHeight:1.7 },
     group:{ display:"flex",gap:16,justifyContent:"center",flexWrap:"wrap" },
     cta:{ background:T.amber,color:"#000",padding:"14px 30px",borderRadius:9,fontWeight:700,textDecoration:"none",fontSize:"1rem" },
@@ -2209,7 +2209,7 @@ function AppShell() {
       <main>
         {confirmedEmail && (
           <div style={{ maxWidth:980,margin:"24px auto 0",padding:"0 20px" }}>
-            <div style={{ background:"rgba(0,229,176,0.08)",border:`1px solid ${T.mint}`,borderRadius:12,padding:"16px 20px",marginBottom:24,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+            <div style={{ background:"rgba(0,229,176,0.08)",border:`1px solid ${T.mint}`,borderRadius:12,padding:"16px 20px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
               <div>
                 <div style={{ fontSize:14,fontWeight:700,color:T.mintText,marginBottom:4 }}>📧 Check your email</div>
                 <div style={{ fontSize:13,color:T.dim }}>We've sent a confirmation link to your inbox. Click it to activate your account — <strong style={{color:T.white}}>this page will automatically sign you in</strong> within a few seconds of confirming. Keep this tab open.</div>
