@@ -72,7 +72,7 @@ const supaHeaders = (token) => ({
   "Authorization": `Bearer ${token || SUPA_KEY}`,
 });
 
-const supaSignUp = async ({ email, password, fullName, ahpra, phone, software }) => {
+const supaSignUp = async ({ email, password, fullName, ahpra, phone, software, regions, minRate, openToTravel }) => {
   const res = await fetch(`${SUPA_URL}/auth/v1/signup`, {
     method:"POST",
     headers:{ "Content-Type":"application/json", "apikey":SUPA_KEY },
@@ -81,7 +81,16 @@ const supaSignUp = async ({ email, password, fullName, ahpra, phone, software })
   options: {
     emailRedirectTo: "https://www.scriptshiftwa.com.au/browse"
   },
-  data:{ full_name:fullName, ahpra_number:ahpra, phone, software, role:"pharmacist" }
+  data:{ 
+    full_name:fullName, 
+    ahpra_number:ahpra, 
+    phone, 
+    software, 
+    role:"pharmacist",
+    regions,
+    min_rate:minRate,
+    open_to_travel:openToTravel
+}
 })
   });
   const data = await res.json();
@@ -237,7 +246,11 @@ function AuthModal({ onClose, onSuccess }) {
       const data = await supaSignUp({
         email: form.email, password: form.password,
         fullName: form.fullName, ahpra: form.ahpra,
-        phone: form.phone, software: form.software.join(", "),
+        phone: form.phone, 
+        software: form.software.join(", "),
+        regions: form.regions.join(", "),
+        minRate: form.minRate,
+        openToTravel: form.openToTravel,
       });
       if (data.access_token) {
         // Email confirmation not required — insert profile immediately with real token
