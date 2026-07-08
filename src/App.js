@@ -1618,7 +1618,7 @@ function AppProvider({ children }) {
               const err = await res.text();
               console.warn("Shift insert failed:", err);
               if (isPaymentSuccess) {
-                navigate("/browse"); "", window.location.pathname);
+                navigate("/browse"); window.location.pathname);
                 setTimeout(() => setToast("⚠ Shift save failed — " + err), 800);
               }
             }
@@ -1626,7 +1626,7 @@ function AppProvider({ children }) {
         } else if (pending && (!t || !u)) {
           console.warn("Pending shift found but no session — will retry on next login");
           if (isPaymentSuccess) {
-            window.history.replaceState({}, "", window.location.pathname);
+            window.history.replaceState({}, window.location.pathname);
             setTimeout(() => setToast("⚠ Please sign in to complete your shift posting."), 800);
           }
         } else if (isPaymentSuccess) {
