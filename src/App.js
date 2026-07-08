@@ -1618,7 +1618,7 @@ function AppProvider({ children }) {
               const err = await res.text();
               console.warn("Shift insert failed:", err);
               if (isPaymentSuccess) {
-                navigate("/browse"); window.location.pathname);
+                navigate("/browse"); 
                 setTimeout(() => setToast("⚠ Shift save failed — " + err), 800);
               }
             }
