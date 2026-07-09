@@ -2007,7 +2007,11 @@ function Header() {
       </div>
       {user ? (
         <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-          <span style={{ fontSize:13,color:T.dim }}>👋 {user.user_metadata?.full_name?.split(" ")[0]||"Pharmacist"}</span>
+          <span 
+        onClick={()=>navigate("/profile")} 
+        style={{ fontSize:13,color:T.amber,cursor:"pointer",fontWeight:600 }}>
+👋 {user.user_metadata?.full_name?.split(" ")[0]||"Profile"}
+</span>
           <button onClick={handleSignOut} style={{ background:"transparent",border:`1px solid ${T.border}`,color:T.dim,borderRadius:7,padding:"7px 14px",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Sign Out</button>
         </div>
       ) : (
