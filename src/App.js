@@ -1483,6 +1483,30 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
     } catch(e) { console.warn(e); }
   };
 
+  const withdrawShift = async (shiftId) => {
+    if (!window.confirm("Withdraw this shift? It will be removed from the live board and all applications will be cancelled.")) return;
+    try {
+      await fetch(SUPA_URL + "/rest/v1/shifts?id=eq." + shiftId, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPA_KEY,
+          "Authorization": "Bearer " + (token || SUPA_KEY),
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({ status: "withdrawn" })
+      });
+      await fetch(SUPA_URL + "/rest/v1/applications?shift_id=eq." + shiftId, {
+        method: "DELETE",
+        headers: {
+          "apikey": SUPA_KEY,
+          "Authorization": "Bearer " + (token || SUPA_KEY),
+        }
+      });
+      setApps(prev => prev.filter(a => a.shift_id !== shiftId));
+      loadShifts();
+    } catch(e) { console.warn(e); }
+  };
   return (
     <div style={{ animation:"fadeUp 0.3s ease" }}>
       <div style={{ fontFamily:"'Playfair Display',serif",fontSize:28,color:T.white,marginBottom:6 }}>Applications Received</div>
@@ -1509,9 +1533,16 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
                       {shift.pharmacy_name} · 📅 {shift.shift_date}
                       <span style={{ fontSize:11,color:T.dim,fontWeight:400,marginLeft:8 }}>{shiftApps.length} application{shiftApps.length!==1?"s":""}</span>
                     </div>
-                    <button onClick={() => closeShift(shiftId)} style={{ fontSize:11,color:T.mint,background:"transparent",border:`1px solid ${T.mint}`,borderRadius:6,padding:"4px 12px",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:600 }}>
-                      ✓ Mark as Filled
-                    </button>
+                    <div style={{ display:"flex", gap:8 }}>
+        <button onClick={() => closeShift(shiftId)}
+        style={{ fontSize:11,color:T.mint,background:"transparent",border:`1px solid ${T.mint}`,borderRadius:6,padding:"4px 12px",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:600 }}>
+✓ Mark as Filled
+  </button>
+  <button onClick={() => withdrawShift(shiftId)}
+    style={{ fontSize:11,color:T.coral,background:"transparent",border:`1px solid ${T.coral}`,borderRadius:6,padding:"4px 12px",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:600 }}>
+    ✕ Withdraw
+  </button>
+</div>
                   </div>
                 )}
                 {shiftApps.map((app,i) => (
