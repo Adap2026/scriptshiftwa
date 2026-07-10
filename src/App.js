@@ -550,7 +550,24 @@ const detectShiftType = (dateStr) => {
   return null;
 };
 
+// ============================================================================
+// FREE FIRST SHIFT — COMPLETE REPLACEMENT PostView
+// ----------------------------------------------------------------------------
+// HOW TO MERGE:
+//   In App.js, select from the line   `function PostView() {`
+//   down to its closing brace `}` (the line just above
+//   `function DeleteAccountSection({ token, onDeleted }) {`)
+//   and replace that whole block with everything below this comment.
+//
+//   No Supabase schema change is required. Eligibility = "this signed-in
+//   user has never posted a shift" (one query on the shifts table), so it
+//   can't be double-claimed and needs no free_shift_used column.
+// ============================================================================
+
 function PostView() {
+  const { user, setShowAuth } = useApp() || {};
+  const navigate = useNavigate();
+
   const [form, setForm] = useState({
     pharmacy_name:"", location:"", region:"Metro",
     date_from:"", date_to:"",
@@ -561,11 +578,30 @@ function PostView() {
   const [step, setStep] = useState("form");
   const [error, setError] = useState("");
   const [typeAutoSet, setTypeAutoSet] = useState(false);
+  const [freeEligible, setFreeEligible] = useState(false);
+  const [posting, setPosting] = useState(false);
+
+  // ── Free first shift eligibility: signed in + has never posted a shift ────
+  useEffect(() => {
+    const checkFreeEligibility = async () => {
+      try {
+        const t = localStorage.getItem("ss_token");
+        const u = JSON.parse(localStorage.getItem("ss_user") || "null");
+        if (!t || !u?.id) { setFreeEligible(false); return; }
+        const res = await fetch(
+          `${SUPA_URL}/rest/v1/shifts?owner_id=eq.${u.id}&select=id&limit=1`,
+          { headers: { "apikey": SUPA_KEY, "Authorization": `Bearer ${t}` } }
+        );
+        const data = await res.json();
+        setFreeEligible(Array.isArray(data) && data.length === 0);
+      } catch(e) { console.warn("Free shift eligibility check failed:", e); }
+    };
+    checkFreeEligibility();
+  }, [user?.id]); // re-check when the user signs in mid-session
 
   const set   = k => e => setForm(p=>({...p,[k]:e.target.value}));
   const check = k => e => setForm(p=>({...p,[k]:e.target.checked}));
 
-  // FIX Bug 2: auto-detect type when start date changes
   const handleDateFrom = e => {
     const val = e.target.value;
     const detected = detectShiftType(val);
@@ -587,11 +623,10 @@ function PostView() {
     setError(""); setStep("pay");
   };
 
-  const handlePay = () => {
-    let link;
+  const handlePay = async () => {
     const sessionUser = JSON.parse(localStorage.getItem("ss_user") || "null");
+    const t = localStorage.getItem("ss_token");
 
-    // Encode full shift data as base64 JSON for the Stripe webhook to use
     const shiftPayload = {
       owner_id: sessionUser?.id || "",
       pharmacy_name: form.pharmacy_name,
@@ -608,36 +643,56 @@ function PostView() {
       accommodation: form.accommodation,
       notes: form.notes,
       status: "active",
-      payment_status: "paid",
+      payment_status: freeEligible ? "free" : "paid",
     };
 
-    // Save to localStorage as fallback
+    // ── FREE FIRST SHIFT: post directly to Supabase, no Stripe ─────────────
+    if (freeEligible && t && sessionUser?.id) {
+      if (posting) return; // guard against double-click double-insert
+      setPosting(true);
+      try {
+        const res = await fetch(`${SUPA_URL}/rest/v1/shifts`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPA_KEY,
+            "Authorization": `Bearer ${t}`,
+            "Prefer": "return=minimal",
+          },
+          body: JSON.stringify(shiftPayload),
+        });
+        if (res.ok) {
+          setFreeEligible(false); // they've now posted a shift — no longer eligible
+          setStep("success");
+        } else {
+          const err = await res.text();
+          console.warn("Free shift insert failed:", err);
+          setError("Couldn't post your free shift — please try again or contact hello@scriptshiftwa.com.au.");
+        }
+      } catch(e) {
+        console.warn("Free shift post error:", e);
+        setError("Network error — please check your connection and try again.");
+      }
+      setPosting(false);
+      return;
+    }
+
+    // ── PAID FLOW: existing Stripe redirect, unchanged ──────────────────────
     try { localStorage.setItem("ss_pending_shift", JSON.stringify(shiftPayload)); } catch(e) {}
-
-    // Encode as base64 for client_reference_id (max 200 chars — use shortened version)
     const refId = btoa(JSON.stringify(shiftPayload)).slice(0, 200);
-
     const params = new URLSearchParams({ client_reference_id: refId });
 
-    if (days <= 1) {
-      link = STRIPE_PAYMENT_LINKS[form.type];
-    } else if (days <= 3) {
-      link = BUNDLE_LINKS[3];
-    } else if (days <= 5) {
-      link = BUNDLE_LINKS[5];
-    } else if (days <= 8) {
-      link = BUNDLE_LINKS[8];
-    } else if (days <= 11) {
-      link = BUNDLE_LINKS[11];
-    } else if (days <= 14) {
-      link = BUNDLE_LINKS[14];
-    } else if (days <= 17) {
-      link = BUNDLE_LINKS[17];
-    } else if (days <= 20) {
-      link = BUNDLE_LINKS[20];
-    } else {
-      link = BUNDLE_LINKS[30];
-    }
+    let link;
+    if (days <= 1) link = STRIPE_PAYMENT_LINKS[form.type];
+    else if (days <= 3) link = BUNDLE_LINKS[3];
+    else if (days <= 5) link = BUNDLE_LINKS[5];
+    else if (days <= 8) link = BUNDLE_LINKS[8];
+    else if (days <= 11) link = BUNDLE_LINKS[11];
+    else if (days <= 14) link = BUNDLE_LINKS[14];
+    else if (days <= 17) link = BUNDLE_LINKS[17];
+    else if (days <= 20) link = BUNDLE_LINKS[20];
+    else link = BUNDLE_LINKS[30];
+
     window.location.href = `${link}?${params}`;
   };
 
@@ -659,6 +714,17 @@ function PostView() {
           </div>
         ))}
       </div>
+
+      {/* ── NEW: Free first shift banner (hidden once posted) ── */}
+      {freeEligible && step !== "success" && (
+        <div style={{ background:"rgba(0,229,176,0.06)",border:`1px solid ${T.mint}`,borderRadius:12,padding:"14px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:12,animation:"fadeUp 0.3s ease" }}>
+          <span style={{ fontSize:22 }}>🎁</span>
+          <div>
+            <div style={{ fontSize:14,fontWeight:700,color:T.mintText,marginBottom:2 }}>Your first shift is free</div>
+            <div style={{ fontSize:13,color:T.dim,lineHeight:1.5 }}>Welcome to ScriptShift WA — your first shift posting is on us. Any type, any region, no payment required.</div>
+          </div>
+        </div>
+      )}
 
       {step==="form" && (
         <div style={{ background:T.bgCard,borderRadius:14,padding:28,border:`1px solid ${T.border}` }}>
@@ -688,8 +754,10 @@ function PostView() {
               <div style={{ marginTop:12,padding:"8px 12px",background:days>1?"rgba(240,165,0,0.08)":"transparent",borderRadius:8,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
                 <span style={{ fontSize:13,color:T.dim }}>{days} shift{days>1?"s":""} selected</span>
                 <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-                  {saving>0 && <span style={{ fontSize:12,color:T.mint,fontWeight:600 }}>Save ${saving} AUD</span>}
-                  <span style={{ fontSize:15,fontWeight:700,color:T.amber }}>{price}</span>
+                  {!freeEligible && saving>0 && <span style={{ fontSize:12,color:T.mint,fontWeight:600 }}>Save ${saving} AUD</span>}
+                  {freeEligible
+                    ? <span style={{ fontSize:15,fontWeight:700,color:T.mintText }}><s style={{color:T.dimmer,fontWeight:400,marginRight:6}}>{price}</s>FREE</span>
+                    : <span style={{ fontSize:15,fontWeight:700,color:T.amber }}>{price}</span>}
                 </div>
               </div>
             )}
@@ -713,8 +781,8 @@ function PostView() {
           <label style={labelStyle}>Notes</label>
           <textarea style={{...inputStyle,minHeight:72,resize:"vertical"}} placeholder="Script volume, services, parking…" value={form.notes} onChange={set("notes")} />
 
-          <button onClick={handleContinue} style={{ background:T.amber,color:"#000",border:"none",borderRadius:9,padding:"13px 32px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
-            Continue to Payment ({days>0?price:SHIFT_PRICES[form.type]}) →
+          <button onClick={handleContinue} style={{ background:freeEligible?T.mint:T.amber,color:"#000",border:"none",borderRadius:9,padding:"13px 32px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+            {freeEligible ? "Continue — First Shift Free →" : `Continue to Payment (${days>0?price:SHIFT_PRICES[form.type]}) →`}
           </button>
         </div>
       )}
@@ -722,7 +790,11 @@ function PostView() {
       {step==="pay" && (
         <div style={{ background:T.bgCard,borderRadius:14,padding:28,border:`1px solid ${T.border}`,animation:"fadeUp 0.3s ease" }}>
           <div style={{ fontFamily:"'Playfair Display',serif",fontSize:22,color:T.white,marginBottom:6 }}>Almost live!</div>
-          <div style={{ fontSize:14,color:T.dim,marginBottom:12,lineHeight:1.6 }}>Click below to pay securely via Stripe. Your shift{days>1?"s go":"goes"} live the moment payment is confirmed.</div>
+          <div style={{ fontSize:14,color:T.dim,marginBottom:12,lineHeight:1.6 }}>
+            {freeEligible
+              ? "Review your shift details below. Your first shift is free — it goes live the moment you confirm."
+              : <>Click below to pay securely via Stripe. Your shift{days>1?"s go":" goes"} live the moment payment is confirmed.</>}
+          </div>
           <div style={{ background:T.bg,borderRadius:10,padding:18,marginBottom:20,border:`1px solid ${T.border}` }}>
             {[
               ["Pharmacy", form.pharmacy_name],
@@ -736,19 +808,23 @@ function PostView() {
               <div key={l} style={{ display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:8,color:T.dim }}><span>{l}</span><span style={{color:T.white,fontWeight:500}}>{v}</span></div>
             ))}
           </div>
-          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(240,165,0,0.06)",border:`1px solid rgba(240,165,0,0.2)`,borderRadius:10,padding:"16px 20px",marginBottom:12 }}>
+          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",background:freeEligible?"rgba(0,229,176,0.06)":"rgba(240,165,0,0.06)",border:`1px solid ${freeEligible?"rgba(0,229,176,0.25)":"rgba(240,165,0,0.2)"}`,borderRadius:10,padding:"16px 20px",marginBottom:12 }}>
             <div>
-              <div style={{ fontSize:13,color:T.dim,marginBottom:3 }}>{days>1?`${days}-day block posting fee`:`${form.type} shift posting fee`}</div>
+              <div style={{ fontSize:13,color:T.dim,marginBottom:3 }}>{freeEligible?"First shift posting — welcome offer":days>1?`${days}-day block posting fee`:`${form.type} shift posting fee`}</div>
               <div style={{ fontSize:12,color:T.dimmer }}>One-time · No commission · No subscription</div>
             </div>
-            <div style={{ fontFamily:"'Playfair Display',serif",fontSize:28,color:T.white }}>{price}</div>
+            <div style={{ fontFamily:"'Playfair Display',serif",fontSize:28,color:freeEligible?T.mintText:T.white }}>
+              {freeEligible ? <><s style={{fontSize:16,color:T.dimmer,marginRight:8}}>{price}</s>FREE</> : price}
+            </div>
           </div>
-          {saving>0 && (
+          {!freeEligible && saving>0 && (
             <div style={{ background:"rgba(0,229,176,0.06)",border:`1px solid rgba(0,229,176,0.2)`,borderRadius:8,padding:"8px 16px",marginBottom:12,fontSize:13,color:T.mintText,fontWeight:600 }}>
               🎉 Bundle discount applied — you're saving ${saving} AUD!
             </div>
           )}
-          <div style={{ fontSize:12,color:T.dimmer,marginBottom:10 }}>🔒 Redirects to Stripe secure checkout · Australian GST applies</div>
+          <div style={{ fontSize:12,color:T.dimmer,marginBottom:10 }}>
+            {freeEligible ? "🎁 No payment required for your first shift" : "🔒 Redirects to Stripe secure checkout · Australian GST applies"}
+          </div>
           {/* Terms & Refund Policy checkbox */}
           <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${T.border}`,borderRadius:10,padding:"14px 16px",marginBottom:20 }}>
             <label style={{ display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer" }}>
@@ -771,15 +847,38 @@ function PostView() {
             <button onClick={()=>setStep("form")} style={{ flex:1,padding:"12px 0",borderRadius:8,border:`1px solid ${T.border}`,background:"transparent",color:T.dim,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>← Back</button>
             <button
               onClick={()=>{ if(!form.termsAccepted){setError("Please read and accept the Terms of Service and Refund Policy to continue.");return;} setError(""); handlePay(); }}
-              style={{ flex:2,padding:"12px 0",borderRadius:8,border:"none",background:form.termsAccepted?T.stripe:"#333",color:form.termsAccepted?"#fff":"#666",fontSize:14,fontWeight:700,cursor:form.termsAccepted?"pointer":"not-allowed",fontFamily:"'Outfit',sans-serif",transition:"all 0.2s" }}
-            >Pay {price} via Stripe →</button>
+              disabled={posting}
+              style={{ flex:2,padding:"12px 0",borderRadius:8,border:"none",background:form.termsAccepted?(freeEligible?T.mint:T.stripe):"#333",color:form.termsAccepted?(freeEligible?"#000":"#fff"):"#666",fontSize:14,fontWeight:700,cursor:form.termsAccepted&&!posting?"pointer":"not-allowed",fontFamily:"'Outfit',sans-serif",transition:"all 0.2s" }}
+            >{posting ? "Posting…" : freeEligible ? "🎁 Post Free Shift →" : `Pay ${price} via Stripe →`}</button>
           </div>
           {error && <div style={{ marginTop:12,fontSize:13,color:T.coral }}>{error}</div>}
+        </div>
+      )}
+
+      {/* ── NEW: Success step (free shift posted) ── */}
+      {step==="success" && (
+        <div style={{ background:T.bgCard,borderRadius:14,padding:"40px 28px",border:`1px solid ${T.mint}`,textAlign:"center",animation:"fadeUp 0.3s ease" }}>
+          <div style={{ fontSize:44,marginBottom:14 }}>🎉</div>
+          <div style={{ fontFamily:"'Playfair Display',serif",fontSize:24,color:T.white,marginBottom:8 }}>Your shift is live!</div>
+          <div style={{ fontSize:14,color:T.dim,marginBottom:28,lineHeight:1.7,maxWidth:380,margin:"0 auto 28px" }}>
+            Your free first shift has been posted to the live board. AHPRA-registered pharmacists across WA can now see and apply for it — you'll find their applications in the Applications tab.
+          </div>
+          <div style={{ display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap" }}>
+            <button onClick={()=>navigate("/browse")}
+              style={{ background:"transparent",border:`1px solid ${T.border}`,color:T.dim,borderRadius:9,padding:"12px 24px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+              View Live Board
+            </button>
+            <button onClick={()=>navigate("/applications")}
+              style={{ background:T.amber,color:"#000",border:"none",borderRadius:9,padding:"12px 28px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+              View Applications →
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 }
+
 function DeleteAccountSection({ token, onDeleted }) {
   const [step, setStep] = useState("idle");
   const [error, setError] = useState(null);
@@ -1412,6 +1511,7 @@ function ApplicantCard({ app, shift, onUpdateStatus }) {
 
 // ── OWNER APPLICATIONS DASHBOARD ─────────────────────────────────────────────
 function OwnerApplicationsDashboard({ user, token, shifts }) {
+  const { loadShifts } = useApp();
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -1995,6 +2095,7 @@ function ForPharmacyOwners() {
 // ============================================================================
 function Header() {
   const { user, liveCount, pulse, handleSignOut, setShowAuth } = useApp();
+  const navigate = useNavigate();
   return (
     <header style={{ background:"rgba(14,15,19,0.95)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${T.border}`,padding:"0 28px",height:60,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100 }}>
       <Link to="/" style={{ display:"flex",alignItems:"center",gap:10,textDecoration:"none" }}>
