@@ -2042,7 +2042,7 @@ function ForPharmacyOwners() {
   <div style={s.page}>
     <Helmet>
       <title>Hire a Locum Pharmacist in WA | ScriptShift WA</title>
-      <meta name="description" content="Post locum pharmacist shifts and find AHPRA-registered cover across Western Australia." />
+      <meta name="description" content="Post locum pharmacist shifts and find AHPRA-registered cover across Western Australia. First shift post free for new pharmacy owners." />
       <link rel="canonical" href="https://www.scriptshiftwa.com.au/for-pharmacy-owners" />
     </Helmet>
     <section style={s.hero}>
