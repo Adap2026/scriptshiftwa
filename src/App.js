@@ -2040,16 +2040,16 @@ function ForPharmacyOwners() {
       <link rel="canonical" href="https://www.scriptshiftwa.com.au/for-pharmacy-owners" />
     </Helmet>
     <section style={s.hero}>
-        <h1 style={s.h1}>Find a qualified locum pharmacist in WA — when you need one.</h1>
-        <p style={s.sub}>ScriptShift WA connects pharmacy owners and managers with AHPRA-registered locum pharmacists across Western Australia. Post a shift in minutes. Fill it fast.</p>
-        <Link to="/post" style={s.cta}>Post a shift</Link>
+       <h1 style={s.h1}>Find a qualified locum pharmacist in WA — your first shift post is free.</h1>
+        <p style={s.sub}>ScriptShift WA connects pharmacy owners and managers with AHPRA-registered locum pharmacists across Western Australia. Post a shift in minutes, fill it fast — and your first posting is on us. No payment details required.</p>
+        <Link to="/post" style={s.cta}>Post your first shift free</Link>
       </section>
 
       <section style={s.section}>
         <h2 style={s.h2}>How it works</h2>
         <div style={s.grid}>
           {[
-            ["1","Post your shift","Enter the date, hours, location, dispensing software, and rate. Takes under two minutes."],
+            ["1","Post your shift — first one's free","Enter the date, hours, location, dispensing software, and rate. Takes under two minutes, and your first posting costs nothing."],
             ["2","Pharmacists apply","AHPRA-verified pharmacists in your area see your listing and express interest directly."],
             ["3","Confirm your cover","Review profiles, select your preferred pharmacist, and confirm the booking — all within the platform."],
             ["4","Done.","Your shift is covered. Pay your locum pharmacist directly after the shift — rates are agreed upfront when posting."],
@@ -2063,10 +2063,11 @@ function ForPharmacyOwners() {
         </div>
       </section>
 
-      <section style={s.section}>
+     <section style={s.section}>
         <h2 style={s.h2}>Why pharmacy owners use ScriptShift WA</h2>
         <ul style={s.list}>
           {[
+            ["Your first shift is free.","Try the platform with zero risk — post your first shift at no cost, no payment details needed."],
             ["No agency middlemen.","Connect directly with locum pharmacists — no commission markups, no phone tag with a recruiter."],
             ["AHPRA-verified pharmacists only.","Every pharmacist on the platform has current, confirmed registration."],
             ["Fast turnaround.","Post an urgent gap today and have it filled within hours for most Perth metro locations."],
@@ -2079,10 +2080,10 @@ function ForPharmacyOwners() {
       </section>
 
       <section style={s.finalCta}>
-        <h2 style={{...s.h2,marginBottom:10}}>Short-staffed? Post a shift now.</h2>
-        <p style={{color:T.dim}}>It takes two minutes. WA locum pharmacists are waiting.</p>
+       <h2 style={{...s.h2,marginBottom:10}}>Short-staffed? Your first shift post is free.</h2>
+        <p style={{color:T.dim}}>It takes two minutes, costs nothing to try, and WA locum pharmacists are waiting.</p>
         <div style={s.ctaGroup}>
-          <Link to="/post" style={s.cta}>Post a shift</Link>
+          <Link to="/post" style={s.cta}>Post your first shift free</Link>
           <Link to="/post" style={s.ctaSecondary}>Learn more about pricing</Link>
         </div>
       </section>
