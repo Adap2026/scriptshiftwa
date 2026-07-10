@@ -725,6 +725,12 @@ function PostView() {
           </div>
         </div>
       )}
+{/* Teaser for visitors who aren't signed in */}
+      {!user && (
+        <div style={{ background:"rgba(0,229,176,0.06)",border:`1px dashed ${T.mint}`,borderRadius:12,padding:"12px 20px",marginBottom:20,fontSize:13,color:T.dim }}>
+          🎁 <span style={{color:T.mintText,fontWeight:700}}>New to ScriptShift?</span> Your first shift posting is free — sign in or register when you post to claim it.
+        </div>
+      )}
 
       {step==="form" && (
         <div style={{ background:T.bgCard,borderRadius:14,padding:28,border:`1px solid ${T.border}` }}>
@@ -1120,7 +1126,7 @@ const LEGAL_CONTENT = {
     sections: [
       { h: "1. About ScriptShift WA", p: "ScriptShift WA is an online marketplace operated by ScriptShift Technologies Pty Ltd (ABN 21 698 500 542) that connects pharmacy owners with locum pharmacists in Western Australia. By using our platform at scriptshiftwa.com.au, you agree to these Terms of Service." },
       { h: "2. Who Can Use ScriptShift WA", p: "Pharmacy owners must be the owner, manager or authorised representative of a pharmacy operating in Western Australia and hold all necessary licences under the Pharmacy Act 2010 (WA). Pharmacists must be currently registered with AHPRA with an active, unconditional registration. You are responsible for maintaining the confidentiality of your account credentials." },
-      { h: "3. Shift Posting Fees", p: "Posting fees: Standard $9 AUD · Evening $9 AUD · Weekend $14 AUD · Emergency $19 AUD · 3-Day Bundle $20 AUD · 5-Day Bundle $30 AUD · 8-Day Bundle $45 AUD (all GST inclusive). Fees are non-refundable once a shift is published. We reserve the right to update fees with 7 days' notice." },
+      { h: "3. Shift Posting Fees", p: "Posting fees: Standard $9 AUD · Evening $9 AUD · Weekend $14 AUD · Emergency $19 AUD · 3-Day Bundle $20 AUD · 5-Day Bundle $30 AUD · 8-Day Bundle $45 AUD (all GST inclusive). New pharmacy owners may be eligible for one complimentary first shift posting, offered at ScriptShift's discretion and subject to change or withdrawal at any time. Fees are non-refundable once a shift is published. We reserve the right to update fees with 7 days' notice." },
       { h: "4. AHPRA Verification", p: "Pharmacists must provide their valid AHPRA registration number during sign-up. By providing this number, you confirm your registration is current and unconditional. ScriptShift WA displays your AHPRA number to pharmacy owners for verification purposes. It is the pharmacy owner's responsibility to confirm registration status before engaging a pharmacist." },
       { h: "5. The Relationship Between Users", p: "ScriptShift WA is a marketplace platform only. We are not a party to any employment or contractor agreement between pharmacy owners and pharmacists. We are not responsible for the conduct of any user, accuracy of shift details, disputes arising from engagements, or payment of wages. Users are solely responsible for ensuring compliance with all applicable laws including the Pharmacy Industry Award 2020." },
       { h: "6. Prohibited Conduct", p: "Users must not: provide false information including false AHPRA numbers; post shifts for pharmacies they are not authorised to represent; use the platform unlawfully; circumvent our payment system; or harass other users. Breach may result in immediate account suspension." },
