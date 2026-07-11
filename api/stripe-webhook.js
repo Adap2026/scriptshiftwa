@@ -104,6 +104,12 @@ export default async function handler(req, res) {
     return res.status(200).json({ received: true, warning: "No shift data" });
   }
 
+  // Roster manager support: posted_by is the acting user.
+  // Falls back to owner_id for owner-posted shifts (and all
+  // legacy checkouts created before this change).
+  shiftData.posted_by = shiftData.posted_by || shiftData.owner_id;
+  }
+
   // Insert shift into Supabase
   let insertedShift = null;
   try {
