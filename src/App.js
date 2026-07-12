@@ -118,7 +118,9 @@ const fmt12 = (t) => { const [h,m]=t.split(":"); const hr=+h; return `${hr>12?hr
 
 // ── AUTH MODAL ────────────────────────────────────────────────────────────────
 function AuthModal({ onClose, onSuccess }) {
-  const [mode, setMode] = useState("signin");
+  const appCtx = useApp();
+  const initialRole = (appCtx && appCtx.pendingRole) || "pharmacist";
+  const [mode, setMode] = useState(initialRole === "roster_manager" ? "signup" : "signin");
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -126,7 +128,7 @@ function AuthModal({ onClose, onSuccess }) {
     email:"", password:"", confirmPassword:"",
     fullName:"", phone:"", ahpra:"",
     software:[], minRate:"60", regions:[], openToTravel:false,
-    role:"pharmacist",
+    role:initialRole,
   });
 
   const set = k => e => setForm(p=>({...p,[k]:e.target.value}));
@@ -1741,7 +1743,10 @@ function AppProvider({ children }) {
   const [confirmedEmail, setConfirmedEmail] = useState(false);
   const [legalDoc, setLegalDoc]   = useState(null);
   const [applyTarget, setTarget]  = useState(null);
+  const [pendingRole, setPendingRole] = useState("pharmacist");
   const navigate = useNavigate();
+
+  const openAuthAs = (role) => { setPendingRole(role); setShowAuth(true); };
 
   useEffect(()=>{
     const init = async () => {
@@ -1970,6 +1975,7 @@ showToast("✓ Welcome to ScriptShift WA!");
     legalDoc, setLegalDoc, applyTarget, setTarget,
     loadShifts, showToast, handleAuthSuccess, handleSignOut,
     handleApply, confirmApply, getValidToken,
+    pendingRole, openAuthAs,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -2134,6 +2140,85 @@ function ForPharmacyOwners() {
 }
 
 // ============================================================================
+// NEW: /for-roster-managers landing page
+// ============================================================================
+function ForRosterManagers() {
+  const { openAuthAs } = useApp();
+  const s = {
+    page:{ maxWidth:960,margin:"0 auto",padding:"60px 24px 80px",fontFamily:"'Outfit',sans-serif",color:T.white },
+    hero:{ textAlign:"center",padding:"24px 0 48px" },
+    h1:{ fontFamily:"'Playfair Display',serif",fontSize:"2.25rem",lineHeight:1.2,marginBottom:10,fontWeight:900 },
+    sub:{ fontSize:"1.05rem",color:T.dim,maxWidth:620,margin:"0 auto 32px",lineHeight:1.7 },
+    cta:{ display:"inline-block",background:T.mint,color:"#000",padding:"14px 30px",borderRadius:9,fontWeight:700,textDecoration:"none",fontSize:"1rem",fontFamily:"'Outfit',sans-serif",border:"none",cursor:"pointer" },
+    ctaSecondary:{ display:"inline-block",background:"transparent",color:T.mintText,border:`2px solid ${T.mint}`,padding:"12px 28px",borderRadius:9,fontWeight:700,textDecoration:"none",fontSize:"1rem",fontFamily:"'Outfit',sans-serif",cursor:"pointer" },
+    section:{ padding:"40px 0" },
+    h2:{ fontFamily:"'Playfair Display',serif",fontSize:"1.75rem",marginBottom:12,textAlign:"center" },
+    grid:{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:18 },
+    step:{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:22 },
+    stepNum:{ display:"inline-flex",alignItems:"center",justifyContent:"center",width:30,height:30,borderRadius:"50%",background:T.mint,color:"#000",fontWeight:800,marginBottom:10 },
+    list:{ listStyle:"none",padding:0,maxWidth:720,margin:"0 auto" },
+    li:{ padding:"12px 0 12px 28px",borderBottom:`1px solid ${T.border}`,position:"relative",lineHeight:1.6,color:T.dim },
+    finalCta:{ textAlign:"center",padding:"48px 24px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:16,marginTop:20 },
+    ctaGroup:{ display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap",marginTop:20 },
+  };
+  return (
+  <div style={s.page}>
+    <Helmet>
+      <title>Roster Manager Access | ScriptShift WA</title>
+      <meta name="description" content="Register as a roster manager on ScriptShift WA to post shifts and book locum pharmacists on behalf of a pharmacy owner." />
+      <link rel="canonical" href="https://www.scriptshiftwa.com.au/for-roster-managers" />
+    </Helmet>
+    <section style={s.hero}>
+        <h1 style={s.h1}>Manage rosters for a pharmacy? Register as a Roster Manager.</h1>
+        <p style={s.sub}>If you handle staffing for a pharmacy owner — booking locums, filling gaps, coordinating cover — a Roster Manager account lets you post shifts and manage applications on their behalf, without needing an AHPRA registration.</p>
+        <button onClick={()=>openAuthAs("roster_manager")} style={s.cta}>Register as Roster Manager →</button>
+      </section>
+
+      <section style={s.section}>
+        <h2 style={s.h2}>How it works</h2>
+        <div style={s.grid}>
+          {[
+            ["1","Register in minutes","Create a free account with just your name, email and phone — no AHPRA number required."],
+            ["2","Get linked to a pharmacy","The pharmacy owner approves your account and links it to their pharmacy from their dashboard."],
+            ["3","Post and manage shifts","Post locum shifts, review applications, and confirm bookings — all on the owner's behalf."],
+            ["4","Owner stays in control","Shifts remain tied to the pharmacy owner's account. You handle the day-to-day; they retain full oversight."],
+          ].map(([n,t,p])=>(
+            <div key={n} style={s.step}>
+              <span style={s.stepNum}>{n}</span>
+              <h3 style={{margin:"8px 0",fontSize:"1.1rem"}}>{t}</h3>
+              <p style={{color:T.dim,lineHeight:1.5,margin:0,fontSize:13}}>{p}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section style={s.section}>
+        <h2 style={s.h2}>Why pharmacies use Roster Managers</h2>
+        <ul style={s.list}>
+          {[
+            ["Delegate the admin.","Free up the pharmacy owner from day-to-day roster and locum coordination."],
+            ["No AHPRA needed.","Roster Managers aren't pharmacists — registration is quick, with just contact details."],
+            ["Multi-pharmacy support.","One Roster Manager account can be linked to more than one pharmacy owner."],
+            ["Full visibility for owners.","Owners can review, approve or revoke manager access at any time."],
+          ].map(([b,d])=>(
+            <li key={b} style={s.li}><strong style={{color:T.white}}>{b}</strong> {d}</li>
+          ))}
+        </ul>
+      </section>
+
+      <section style={s.finalCta}>
+        <h2 style={{...s.h2,marginBottom:10}}>Ready to manage rosters on ScriptShift WA?</h2>
+        <p style={{color:T.dim}}>Register free — a pharmacy owner will link your account to get you started.</p>
+        <div style={s.ctaGroup}>
+          <button onClick={()=>openAuthAs("roster_manager")} style={s.cta}>Register as Roster Manager →</button>
+          <Link to="/for-pharmacy-owners" style={s.ctaSecondary}>I'm a Pharmacy Owner instead</Link>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ============================================================================
 // NEW: Header + Nav, now using <Link> instead of state-based view switching
 // ============================================================================
 function Header() {
@@ -2218,6 +2303,7 @@ function Footer() {
               <div style={{ fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:1,textTransform:"uppercase",marginBottom:10 }}>Platform</div>
               <div style={{ marginBottom:8 }}><Link to="/for-pharmacists" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>For Pharmacists</Link></div>
               <div style={{ marginBottom:8 }}><Link to="/for-pharmacy-owners" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>For Pharmacy Owners</Link></div>
+              <div style={{ marginBottom:8 }}><Link to="/for-roster-managers" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>For Roster Managers</Link></div>
               <div style={{ marginBottom:8 }}><Link to="/browse" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>Browse Shifts</Link></div>
               <div style={{ marginBottom:8 }}><Link to="/post" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>Post a Shift</Link></div>
               <div style={{ marginBottom:8 }}><span onClick={()=>setShowAuth(true)} style={{ fontSize:13,color:T.dim,cursor:"pointer" }}>Sign In / Register</span></div>
@@ -2370,6 +2456,7 @@ function Home() {
       <div style={s.group}>
         <Link to="/for-pharmacists" style={s.cta}>I'm a Pharmacist</Link>
         <Link to="/for-pharmacy-owners" style={s.ctaAlt}>I'm a Pharmacy Owner</Link>
+        <Link to="/for-roster-managers" style={{...s.ctaAlt, borderColor:T.mint, color:T.mintText}}>I'm a Roster Manager</Link>
       </div>
     </div>
   );
@@ -2416,6 +2503,7 @@ function AppShell() {
           <Route path="/" element={<Home />} />
           <Route path="/for-pharmacists" element={<ForPharmacists />} />
           <Route path="/for-pharmacy-owners" element={<ForPharmacyOwners />} />
+          <Route path="/for-roster-managers" element={<ForRosterManagers />} />
           <Route path="/blog/how-to-find-locum-pharmacist-work-in-wa" element={<BlogLocumGuide />} />
           <Route path="/browse" element={<BrowseRoute />} />
           <Route path="/post" element={<PostRoute />} />
