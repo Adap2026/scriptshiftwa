@@ -126,6 +126,7 @@ function AuthModal({ onClose, onSuccess }) {
     email:"", password:"", confirmPassword:"",
     fullName:"", phone:"", ahpra:"",
     software:[], minRate:"60", regions:[], openToTravel:false,
+    role:"pharmacist",
   });
 
   const set = k => e => setForm(p=>({...p,[k]:e.target.value}));
@@ -153,7 +154,9 @@ function AuthModal({ onClose, onSuccess }) {
     if (!form.fullName || !form.email || !form.password) { setError("Please fill in all required fields."); return; }
     if (form.password.length < 8) { setError("Password must be at least 8 characters."); return; }
     if (form.password !== form.confirmPassword) { setError("Passwords do not match."); return; }
-    setError(""); setStep(2);
+    setError("");
+    if (form.role === "roster_manager") { handleSignUpFinal(); return; }
+    setStep(2);
   };
 
   const handleSignUpStep2 = () => {
@@ -166,7 +169,13 @@ function AuthModal({ onClose, onSuccess }) {
   };
 
   const insertProfile = async (userId, token) => {
-    const payload = {
+    const payload = form.role === "roster_manager" ? {
+      id: userId,
+      full_name: form.fullName,
+      phone: form.phone,
+      role: "roster_manager",
+      email: form.email,
+    } : {
       id: userId,
       full_name: form.fullName,
       ahpra_number: form.ahpra.trim().toUpperCase(),
@@ -230,7 +239,7 @@ function AuthModal({ onClose, onSuccess }) {
   };
 
   const handleSignUpFinal = async () => {
-    if (form.regions.length === 0) { setError("Please select at least one region."); return; }
+    if (form.role !== "roster_manager" && form.regions.length === 0) { setError("Please select at least one region."); return; }
     setLoading(true); setError("");
     try {
       const data = await supaSignUp({
@@ -241,6 +250,7 @@ function AuthModal({ onClose, onSuccess }) {
         regions: form.regions.join(", "),
         minRate: form.minRate,
         openToTravel: form.openToTravel,
+        role: form.role,
       });
       if (data.access_token) {
         // Email confirmation not required — insert profile immediately with real token
@@ -310,14 +320,26 @@ function AuthModal({ onClose, onSuccess }) {
         </>}
 
         {mode==="signup" && <>
-          <div style={s.stepIndicator}>
-            {[1,2,3].map(n=><div key={n} style={s.stepDot(step===n, step>n)}/>)}
-          </div>
+          {form.role==="pharmacist" && (
+            <div style={s.stepIndicator}>
+              {[1,2,3].map(n=><div key={n} style={s.stepDot(step===n, step>n)}/>)}
+            </div>
+          )}
 
           {step===1 && <>
             <div style={s.title}>Create your account</div>
-            <div style={s.sub}>Step 1 of 3 — Your login details</div>
+            <div style={s.sub}>{form.role==="roster_manager" ? "Your login details" : "Step 1 of 3 — Your login details"}</div>
             {error && <div style={s.err}>⚠ {error}</div>}
+            <label style={s.label}>I am registering as *</label>
+            <div style={s.chipRow}>
+              <div style={s.chip(form.role==="pharmacist")} onClick={()=>setForm(p=>({...p,role:"pharmacist"}))}>💊 Locum Pharmacist</div>
+              <div style={s.chip(form.role==="roster_manager")} onClick={()=>setForm(p=>({...p,role:"roster_manager"}))}>📋 Roster Manager</div>
+            </div>
+            {form.role==="roster_manager" && (
+              <div style={s.infoBox}>
+                Roster managers post shifts and book locums on behalf of pharmacy owners. No AHPRA number needed — after you register, the pharmacy owner links your account to their pharmacy.
+              </div>
+            )}
             <label style={s.label}>Full Name *</label>
             <input style={s.input} placeholder="Sarah Chen" value={form.fullName} onChange={set("fullName")} />
             <label style={s.label}>Email Address *</label>
@@ -334,7 +356,9 @@ function AuthModal({ onClose, onSuccess }) {
             </div>
             <label style={s.label}>Phone Number</label>
             <input style={s.input} type="tel" placeholder="04XX XXX XXX" value={form.phone} onChange={set("phone")} />
-            <button style={s.btn(T.amber)} onClick={handleSignUpStep1}>Continue →</button>
+            <button style={s.btn(form.role==="roster_manager"?T.mint:T.amber)} onClick={handleSignUpStep1} disabled={loading}>
+              {form.role==="roster_manager" ? (loading ? "Creating account…" : "✓ Create My Account") : "Continue →"}
+            </button>
           </>}
 
           {step===2 && <>
@@ -1660,6 +1684,27 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
 // ============================================================================
 const insertProfileFromMeta = async (userData, token) => {
   const meta = userData.user_metadata || {};
+  const role = meta.role || "pharmacist";
+  if (role === "roster_manager") {
+    const payload = {
+      id: userData.id,
+      full_name: meta.full_name || "",
+      phone: meta.phone || "",
+      role: "roster_manager",
+      email: userData.email,
+    };
+    await fetch(`${SUPA_URL}/rest/v1/profiles?id=eq.${userData.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPA_KEY,
+        "Authorization": `Bearer ${token}`,
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify(payload),
+    });
+    return;
+  }
   if (!meta.ahpra_number) return;
   const payload = {
     id: userData.id,
