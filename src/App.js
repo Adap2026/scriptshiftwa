@@ -71,27 +71,17 @@ const supaHeaders = (token) => ({
   "apikey": SUPA_KEY,
   "Authorization": `Bearer ${token || SUPA_KEY}`,
 });
-
-const supaSignUp = async ({ email, password, fullName, ahpra, phone, software, regions, minRate, openToTravel }) => {
+const supaSignUp = async ({ email, password, fullName, ahpra, phone, software, regions, minRate, openToTravel, role = "pharmacist" }) => {
   const res = await fetch(`${SUPA_URL}/auth/v1/signup`, {
     method:"POST",
     headers:{ "Content-Type":"application/json", "apikey":SUPA_KEY },
     body: JSON.stringify({
-  email, password,
-  options: {
-    emailRedirectTo: "https://www.scriptshiftwa.com.au/browse"
-  },
-  data:{ 
-    full_name:fullName, 
-    ahpra_number:ahpra, 
-    phone, 
-    software, 
-    role:"pharmacist",
-    regions,
-    min_rate:minRate,
-    open_to_travel:openToTravel
-}
-})
+      email, password,
+      options: { emailRedirectTo: "https://www.scriptshiftwa.com.au/browse" },
+      data: role === "roster_manager"
+        ? { full_name:fullName, phone, role:"roster_manager" }
+        : { full_name:fullName, ahpra_number:ahpra, phone, software, role:"pharmacist", regions, min_rate:minRate, open_to_travel:openToTravel }
+    })
   });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message || data.msg);
