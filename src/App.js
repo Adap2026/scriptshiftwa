@@ -430,7 +430,7 @@ function AuthModal({ onClose, onSuccess }) {
 }
 
 // ── SHIFT CARD ────────────────────────────────────────────────────────────────
-function ShiftCard({ shift, applied, onApply, user, token, animDelay }) {
+function ShiftCard({ shift, applied, onApply, user, token, animDelay, onWithdraw, onMarkFilled }) {
   const badge = SHIFT_BADGE[shift.type] || SHIFT_BADGE.Standard;
   const [hovered, setHovered] = useState(false);
 
@@ -465,8 +465,20 @@ function ShiftCard({ shift, applied, onApply, user, token, animDelay }) {
       <div style={{ fontSize:11,color:T.dimmer,marginTop:3,marginBottom:14 }}>{shift.posted} · {shift.applicant_count} {shift.applicant_count===1?"applicant":"applicants"}</div>
       <div style={{ paddingTop:14,borderTop:`1px solid ${T.border}` }}>
         {user && user.id === shift.owner_id ? (
-          <div style={{ textAlign:"center",padding:"8px 0",fontSize:13,color:T.amber,fontWeight:700 }}>
-            👁 {shift.applicant_count || 0} applicant{shift.applicant_count !== 1 ? "s" : ""} — check Applications tab
+          <div>
+            <div style={{ textAlign:"center",padding:"4px 0 10px",fontSize:13,color:T.amber,fontWeight:700 }}>
+              👁 {shift.applicant_count || 0} applicant{shift.applicant_count !== 1 ? "s" : ""} — check Applications tab
+            </div>
+            <div style={{ display:"flex",gap:8 }}>
+              <button onClick={()=>onMarkFilled && onMarkFilled(shift.id)}
+                style={{ flex:1,background:T.mintDim,color:T.mintText,border:`1px solid ${T.mint}`,borderRadius:7,padding:"8px 0",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+                ✓ Mark as Filled
+              </button>
+              <button onClick={()=>onWithdraw && onWithdraw(shift.id)}
+                style={{ flex:1,background:T.coralDim,color:T.coral,border:`1px solid ${T.coral}`,borderRadius:7,padding:"8px 0",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
+                ✕ Withdraw
+              </button>
+            </div>
           </div>
         ) : (
           <button onClick={()=>onApply(shift)}
@@ -2341,7 +2353,7 @@ function Footer() {
 // NEW: Browse view as a route (uses your unchanged ShiftCard component)
 // ============================================================================
 function BrowseRoute() {
-  const { shifts, applied, handleApply, user, token, liveCount } = useApp();
+  const { shifts, applied, handleApply, user, token, liveCount, loadShifts } = useApp();
   const [regionFilter, setReg] = useState("All");
   const [typeFilter, setType] = useState("All");
   const navigate = useNavigate();
@@ -2357,6 +2369,47 @@ function BrowseRoute() {
   });
 
   const { setShowAuth } = useApp();
+
+  const markFilled = async (shiftId) => {
+    if (!window.confirm("Mark this shift as filled? It will be removed from the live board and no further applications will be accepted.")) return;
+    try {
+      await fetch(SUPA_URL + "/rest/v1/shifts?id=eq." + shiftId, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPA_KEY,
+          "Authorization": "Bearer " + (token || SUPA_KEY),
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({ status: "filled" })
+      });
+      loadShifts();
+    } catch(e) { console.warn(e); }
+  };
+
+  const withdrawShift = async (shiftId) => {
+    if (!window.confirm("Withdraw this shift? It will be removed from the live board and all applications will be cancelled.")) return;
+    try {
+      await fetch(SUPA_URL + "/rest/v1/shifts?id=eq." + shiftId, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPA_KEY,
+          "Authorization": "Bearer " + (token || SUPA_KEY),
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({ status: "withdrawn" })
+      });
+      await fetch(SUPA_URL + "/rest/v1/applications?shift_id=eq." + shiftId, {
+        method: "DELETE",
+        headers: {
+          "apikey": SUPA_KEY,
+          "Authorization": "Bearer " + (token || SUPA_KEY),
+        }
+      });
+      loadShifts();
+    } catch(e) { console.warn(e); }
+  };
 
   return (
     <div style={{ maxWidth:980,margin:"0 auto",padding:"32px 20px 80px" }}>
@@ -2394,7 +2447,7 @@ function BrowseRoute() {
             <button onClick={()=>navigate("/post")} style={{ background:T.amber,color:"#000",border:"none",borderRadius:9,padding:"12px 28px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Post the First Shift →</button>
           </div>
         ) : filtered.map((s,i)=>(
-          <ShiftCard key={s.id} shift={s} applied={applied.has(s.id)} onApply={handleApply} user={user} token={token} animDelay={i*0.06} />
+          <ShiftCard key={s.id} shift={s} applied={applied.has(s.id)} onApply={handleApply} user={user} token={token} animDelay={i*0.06} onWithdraw={withdrawShift} onMarkFilled={markFilled} />
         ))}
       </div>
     </div>
