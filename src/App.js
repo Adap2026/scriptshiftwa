@@ -629,6 +629,7 @@ function PostView() {
 
     const shiftPayload = {
       owner_id: sessionUser?.id || "",
+      posted_by: sessionUser?.id || "",
       pharmacy_name: form.pharmacy_name,
       location: form.location,
       region: form.region,
