@@ -334,7 +334,7 @@ function AuthModal({ onClose, onSuccess }) {
             {error && <div style={s.err}>⚠ {error}</div>}
             <label style={s.label}>I am registering as *</label>
             <div style={s.chipRow}>
-              <div style={s.chip(form.role==="pharmacist")} onClick={()=>setForm(p=>({...p,role:"pharmacist"}))}>💊 Locum Pharmacist</div>
+              <div style={s.chip(form.role==="pharmacist")} onClick={()=>setForm(p=>({...p,role:"pharmacist"}))}>💊 Pharmacist</div>
               <div style={s.chip(form.role==="roster_manager")} onClick={()=>setForm(p=>({...p,role:"roster_manager"}))}>📋 Roster Manager</div>
             </div>
             {form.role==="roster_manager" && (
