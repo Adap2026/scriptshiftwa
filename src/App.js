@@ -335,11 +335,11 @@ function AuthModal({ onClose, onSuccess }) {
             <label style={s.label}>I am registering as *</label>
             <div style={s.chipRow}>
               <div style={s.chip(form.role==="pharmacist")} onClick={()=>setForm(p=>({...p,role:"pharmacist"}))}>💊 Pharmacist</div>
-              <div style={s.chip(form.role==="roster_manager")} onClick={()=>setForm(p=>({...p,role:"roster_manager"}))}>📋 Roster Manager</div>
+              <div style={s.chip(form.role==="roster_manager")} onClick={()=>setForm(p=>({...p,role:"roster_manager"}))}>📋 HR Manager</div>
             </div>
             {form.role==="roster_manager" && (
               <div style={s.infoBox}>
-                Roster managers post shifts and book locums on behalf of pharmacy owners. No AHPRA number needed — after you register, the pharmacy owner links your account to their pharmacy.
+                HR managers post shifts and book locums on behalf of pharmacy owners. No AHPRA number needed — after you register, the pharmacy owner links your account to their pharmacy.
               </div>
             )}
             <label style={s.label}>Full Name *</label>
@@ -2176,14 +2176,14 @@ function ForRosterManagers() {
   return (
   <div style={s.page}>
     <Helmet>
-      <title>Roster Manager Access | ScriptShift WA</title>
-      <meta name="description" content="Register as a roster manager on ScriptShift WA to post shifts and book locum pharmacists on behalf of a pharmacy owner." />
+      <title>HR Manager Access | ScriptShift WA</title>
+      <meta name="description" content="Register as an HR manager on ScriptShift WA to post shifts and book locum pharmacists on behalf of a pharmacy owner." />
       <link rel="canonical" href="https://www.scriptshiftwa.com.au/for-roster-managers" />
     </Helmet>
     <section style={s.hero}>
-        <h1 style={s.h1}>Manage rosters for a pharmacy? Register as a Roster Manager.</h1>
-        <p style={s.sub}>If you handle staffing for a pharmacy owner — booking locums, filling gaps, coordinating cover — a Roster Manager account lets you post shifts and manage applications on their behalf, without needing an AHPRA registration.</p>
-        <button onClick={()=>openAuthAs("roster_manager")} style={s.cta}>Register as Roster Manager →</button>
+        <h1 style={s.h1}>Manage rosters for a pharmacy? Register as an HR Manager.</h1>
+        <p style={s.sub}>If you handle staffing for a pharmacy owner — booking locums, filling gaps, coordinating cover — an HR Manager account lets you post shifts and manage applications on their behalf, without needing an AHPRA registration.</p>
+        <button onClick={()=>openAuthAs("roster_manager")} style={s.cta}>Register as HR Manager →</button>
       </section>
 
       <section style={s.section}>
@@ -2205,12 +2205,12 @@ function ForRosterManagers() {
       </section>
 
       <section style={s.section}>
-        <h2 style={s.h2}>Why pharmacies use Roster Managers</h2>
+        <h2 style={s.h2}>Why pharmacies use HR Managers</h2>
         <ul style={s.list}>
           {[
             ["Delegate the admin.","Free up the pharmacy owner from day-to-day roster and locum coordination."],
-            ["No AHPRA needed.","Roster Managers aren't pharmacists — registration is quick, with just contact details."],
-            ["Multi-pharmacy support.","One Roster Manager account can be linked to more than one pharmacy owner."],
+            ["No AHPRA needed.","HR Managers aren't pharmacists — registration is quick, with just contact details."],
+            ["Multi-pharmacy support.","One HR Manager account can be linked to more than one pharmacy owner."],
             ["Full visibility for owners.","Owners can review, approve or revoke manager access at any time."],
           ].map(([b,d])=>(
             <li key={b} style={s.li}><strong style={{color:T.white}}>{b}</strong> {d}</li>
@@ -2222,7 +2222,7 @@ function ForRosterManagers() {
         <h2 style={{...s.h2,marginBottom:10}}>Ready to manage rosters on ScriptShift WA?</h2>
         <p style={{color:T.dim}}>Register free — a pharmacy owner will link your account to get you started.</p>
         <div style={s.ctaGroup}>
-          <button onClick={()=>openAuthAs("roster_manager")} style={s.cta}>Register as Roster Manager →</button>
+          <button onClick={()=>openAuthAs("roster_manager")} style={s.cta}>Register as HR Manager →</button>
           <Link to="/for-pharmacy-owners" style={s.ctaSecondary}>I'm a Pharmacy Owner instead</Link>
         </div>
       </section>
@@ -2315,7 +2315,7 @@ function Footer() {
               <div style={{ fontSize:11,fontWeight:700,color:T.dimmer,letterSpacing:1,textTransform:"uppercase",marginBottom:10 }}>Platform</div>
               <div style={{ marginBottom:8 }}><Link to="/for-pharmacists" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>For Pharmacists</Link></div>
               <div style={{ marginBottom:8 }}><Link to="/for-pharmacy-owners" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>For Pharmacy Owners</Link></div>
-              <div style={{ marginBottom:8 }}><Link to="/for-roster-managers" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>For Roster Managers</Link></div>
+              <div style={{ marginBottom:8 }}><Link to="/for-roster-managers" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>For HR Managers</Link></div>
               <div style={{ marginBottom:8 }}><Link to="/browse" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>Browse Shifts</Link></div>
               <div style={{ marginBottom:8 }}><Link to="/post" style={{ fontSize:13,color:T.dim,textDecoration:"none" }}>Post a Shift</Link></div>
               <div style={{ marginBottom:8 }}><span onClick={()=>setShowAuth(true)} style={{ fontSize:13,color:T.dim,cursor:"pointer" }}>Sign In / Register</span></div>
@@ -2509,7 +2509,7 @@ function Home() {
       <div style={s.group}>
         <Link to="/for-pharmacists" style={s.cta}>I'm a Pharmacist</Link>
         <Link to="/for-pharmacy-owners" style={s.ctaAlt}>I'm a Pharmacy Owner</Link>
-        <Link to="/for-roster-managers" style={{...s.ctaAlt, borderColor:T.mint, color:T.mintText}}>I'm a Roster Manager</Link>
+        <Link to="/for-roster-managers" style={{...s.ctaAlt, borderColor:T.mint, color:T.mintText}}>I'm an HR Manager</Link>
       </div>
     </div>
   );
