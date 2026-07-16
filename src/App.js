@@ -674,8 +674,8 @@ function PostView() {
       status: "active",
       payment_status: freeEligible ? "free" : "paid",
     };
-
-    // ── FREE FIRST SHIFT: post directly to Supabase, no Stripe ─────────────
+    
+// ── FREE FIRST SHIFT: post directly to Supabase, no Stripe ─────────────
     if (freeEligible && t && sessionUser?.id) {
       if (posting) return; // guard against double-click double-insert
       setPosting(true);
@@ -686,11 +686,26 @@ function PostView() {
             "Content-Type": "application/json",
             "apikey": SUPA_KEY,
             "Authorization": `Bearer ${t}`,
-            "Prefer": "return=minimal",
+            "Prefer": "return=representation",
           },
           body: JSON.stringify(shiftPayload),
         });
         if (res.ok) {
+          // Notify matching pharmacists (email + native push) — same path paid shifts use.
+          // Not awaited: the owner shouldn't wait on the send.
+          try {
+            const inserted = await res.json();
+            const newShift = Array.isArray(inserted) ? inserted[0] : inserted;
+            if (newShift?.id) {
+              fetch("/api/notify-shift", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ shiftId: newShift.id }),
+              }).catch(e => console.warn("notify-shift failed:", e));
+            }
+          } catch (e) {
+            console.warn("Could not read inserted shift:", e);
+          }
           setFreeEligible(false); // they've now posted a shift — no longer eligible
           setStep("success");
         } else {
