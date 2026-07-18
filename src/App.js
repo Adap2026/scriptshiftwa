@@ -11,22 +11,6 @@ import {
 import { HelmetProvider, Helmet } from "react-helmet-async";
 import BlogLocumGuide from "./pages/BlogLocumGuide";
 
-// ============================================================================
-// IMPORTANT — HOW TO MERGE THIS FILE INTO YOUR PROJECT
-// ============================================================================
-// 1. Everything between the "COPY START" and "COPY END" markers below is
-//    UNCHANGED from your existing App.jsx — every component (AuthModal,
-//    ShiftCard, ApplyModal, PostView, ProfileView, LegalModal,
-//    ApplicationsView, OwnerShiftApplications, ApplicantCard,
-//    OwnerApplicationsDashboard) is copy-pasted exactly as you had it.
-//    I am NOT reproducing all of it again in this message to keep things
-//    readable — see the merge instructions below the code for exactly
-//    what to paste where.
-// 2. The NEW code is the AppProvider/AppContext, ForPharmacists,
-//    ForPharmacyOwners, AppShell, and the new default-export App at the
-//    bottom of this file.
-// ============================================================================
-
 // ── Fonts ─────────────────────────────────────────────────────────────────────
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Outfit:wght@300;400;500;600;700&display=swap');`;
 
@@ -46,20 +30,46 @@ const SHIFT_BADGE = {
   Emergency:{ bg:T.coralDim, color:T.coral,    border:"#5C2020", dot:T.coral },
   Standard: { bg:T.mintDim,  color:T.mintText,  border:"#0A5040", dot:T.mint },
   Weekend:  { bg:T.lavDim,   color:T.lavender,  border:"#2A2560", dot:T.lavender },
-  Evening:  { bg:T.amberDim, color:T.amberText, border:"#503A00", dot:T.amber },
 };
 
-// ── Stripe Payment Links ───────────────────────────────────────────────────────
-const STRIPE_PAYMENT_LINKS = {
-  Standard: "https://buy.stripe.com/bJebIUffv5u6fWK0Wva7C08",
-  Evening:  "https://buy.stripe.com/00w28kgjz7Ce8uicFda7C09",
-  Weekend:  "https://buy.stripe.com/aFa00cd7naOq7qedJha7C0c",
-  Emergency:"https://buy.stripe.com/8x26oA6IZ8Gi8ui9t1a7C0b",
+// ── Listing fees ──────────────────────────────────────────────────────────────
+// A listing fee is charged per calendar day the shift is advertised for.
+// There are no bundles and no volume discounts: total = daily rate × days.
+// Evening shifts have been folded into Standard.
+const DAILY_RATE = {
+  Standard: 9,
+  Weekend: 14,
+  Emergency: 19,
 };
 
-const SHIFT_PRICES = {
-  Standard:"$9 AUD", Evening:"$9 AUD",
-  Weekend:"$14 AUD", Emergency:"$19 AUD",
+const SHIFT_TYPES = ["Standard", "Weekend", "Emergency"];
+
+const getDayCount = (start, end) => {
+  if (!start) return 0;
+  const s = new Date(start + "T00:00:00");
+  const e = new Date((end || start) + "T00:00:00");
+  if (isNaN(s) || isNaN(e) || e < s) return 0;
+  return Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+};
+
+const getListingTotal = (days, type) => {
+  const rate = DAILY_RATE[type] || DAILY_RATE.Standard;
+  return rate * Math.max(0, days);
+};
+
+const fmtAud = (n) => `$${n} AUD`;
+
+// Detect shift type from the start date — weekend, or emergency if within 2 days.
+const detectShiftType = (dateStr) => {
+  if (!dateStr) return null;
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const d = new Date(year, month - 1, day); // local time, no UTC conversion
+  const dayOfWeek = d.getDay(); // 0=Sun, 6=Sat
+  if (dayOfWeek === 0 || dayOfWeek === 6) return "Weekend";
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diffDays = Math.round((d - today) / (1000*60*60*24));
+  if (diffDays >= 0 && diffDays <= 2) return "Emergency";
+  return null;
 };
 
 // ── Supabase client (lightweight fetch-based) ─────────────────────────────────
@@ -71,6 +81,7 @@ const supaHeaders = (token) => ({
   "apikey": SUPA_KEY,
   "Authorization": `Bearer ${token || SUPA_KEY}`,
 });
+
 const supaSignUp = async ({ email, password, fullName, ahpra, phone, software, regions, minRate, openToTravel, role = "pharmacist" }) => {
   const res = await fetch(`${SUPA_URL}/auth/v1/signup`, {
     method:"POST",
@@ -142,8 +153,8 @@ function AuthModal({ onClose, onSuccess }) {
     setLoading(true); setError("");
     try {
       const data = await supaSignIn({ email:form.email, password:form.password });
-      try { 
-        localStorage.setItem("ss_token", data.access_token); 
+      try {
+        localStorage.setItem("ss_token", data.access_token);
         localStorage.setItem("ss_user", JSON.stringify(data.user));
         if (data.refresh_token) localStorage.setItem("ss_refresh_token", data.refresh_token);
       } catch(e) {}
@@ -189,7 +200,6 @@ function AuthModal({ onClose, onSuccess }) {
       open_to_travel: form.openToTravel,
       email: form.email,
     };
-    // First try PATCH (update existing row created by trigger)
     const patchRes = await fetch(`${SUPA_URL}/rest/v1/profiles?id=eq.${userId}`, {
       method: "PATCH",
       headers: {
@@ -200,7 +210,6 @@ function AuthModal({ onClose, onSuccess }) {
       },
       body: JSON.stringify(payload),
     });
-    // If no row existed, insert instead
     if (patchRes.status === 404 || patchRes.status === 406) {
       await fetch(`${SUPA_URL}/rest/v1/profiles`, {
         method: "POST",
@@ -215,8 +224,6 @@ function AuthModal({ onClose, onSuccess }) {
     }
   };
 
-  // FIX Issue 1: after email confirmation, poll for session every 3s so the
-  // app auto-logs the pharmacist in without them having to sign in again manually
   const pollForSession = (savedForm) => {
     const interval = setInterval(async () => {
       try {
@@ -230,13 +237,11 @@ function AuthModal({ onClose, onSuccess }) {
           clearInterval(interval);
           localStorage.setItem("ss_token", data.access_token);
           localStorage.setItem("ss_user", JSON.stringify(data.user));
-          // Now insert profile with authenticated token
           if (data.user?.id) await insertProfile(data.user.id, data.access_token);
           onSuccess(data);
         }
       } catch(e) {}
     }, 3000);
-    // Stop polling after 10 minutes
     setTimeout(() => clearInterval(interval), 600000);
   };
 
@@ -247,7 +252,7 @@ function AuthModal({ onClose, onSuccess }) {
       const data = await supaSignUp({
         email: form.email, password: form.password,
         fullName: form.fullName, ahpra: form.ahpra,
-        phone: form.phone, 
+        phone: form.phone,
         software: form.software.join(", "),
         regions: form.regions.join(", "),
         minRate: form.minRate,
@@ -255,13 +260,11 @@ function AuthModal({ onClose, onSuccess }) {
         role: form.role,
       });
       if (data.access_token) {
-        // Email confirmation not required — insert profile immediately with real token
         localStorage.setItem("ss_token", data.access_token);
         localStorage.setItem("ss_user", JSON.stringify(data.user));
         if (data.user?.id) await insertProfile(data.user.id, data.access_token);
         onSuccess(data);
       } else {
-        // Needs email confirmation — save form and start polling for session
         const savedForm = { email: form.email, password: form.password };
         pollForSession(savedForm);
         onSuccess({ needsConfirmation: true, email: form.email });
@@ -522,76 +525,8 @@ function ApplyModal({ shift, onClose, onConfirm }) {
 }
 
 // ── POST SHIFT ────────────────────────────────────────────────────────────────
-const BUNDLE_LINKS = {
-  1: null,
-  3: "https://buy.stripe.com/9B66oA7N38Gi4e25cLa7C0d",
-  5: "https://buy.stripe.com/5kQcMY8R7bSu5i6bB9a7C0a",
-  8: "https://buy.stripe.com/4gM3co4AR6yacKydJha7C07",
-  11: "https://buy.stripe.com/eVqcMY6IZf4G8ui34Da7C0f",
-  14: "https://buy.stripe.com/6oUcMYd7n3lY6maax5a7C0g",
-  17: "https://buy.stripe.com/5kQaEQd7n09M11Q20za7C0h",
-  20: "https://buy.stripe.com/7sYcMYaZf7Ce25UcFda7C0i",
-  30: "https://buy.stripe.com/fZubIU5EV8Gi7qecFda7C0j",
-};
-
-const getDayCount = (start, end) => {
-  if (!start || !end) return 0;
-  const s = new Date(start), e = new Date(end);
-  if (e < s) return 0;
-  return Math.round((e - s) / (1000*60*60*24)) + 1;
-};
-
-// FIX Bug 3: beyond 8 days charge $45 for first 8 + $6/day for each additional day
-const getBundlePrice = (days, type) => {
-  const base = { Standard:9, Evening:9, Weekend:14, Emergency:19 }[type] || 9;
-  if (days <= 1) return `$${base} AUD`;
-  if (days <= 3) return `$20 AUD`;
-  if (days <= 5) return `$30 AUD`;
-  if (days <= 8) return `$45 AUD`;
-  const extra = days - 8;
-  return `$${45 + extra * 6} AUD`;
-};
-
-const getSaving = (days, type) => {
-  const base = { Standard:9, Evening:9, Weekend:14, Emergency:19 }[type] || 9;
-  if (days <= 1) return 0;
-  const full = days * base;
-  let discounted;
-  if (days <= 3) discounted = 20;
-  else if (days <= 5) discounted = 30;
-  else if (days <= 8) discounted = 45;
-  else discounted = 45 + (days - 8) * 6;
-  return Math.max(0, full - discounted);
-};
-
-// FIX Bug 2: detect shift type from date — weekend or emergency (within 2 days)
-const detectShiftType = (dateStr) => {
-  if (!dateStr) return null;
-  // Parse date parts directly to avoid UTC timezone offset shifting the day
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const d = new Date(year, month - 1, day); // local time, no UTC conversion
-  const dayOfWeek = d.getDay(); // 0=Sun, 6=Sat
-  if (dayOfWeek === 0 || dayOfWeek === 6) return "Weekend";
-  const today = new Date(); today.setHours(0,0,0,0);
-  const diffDays = Math.round((d - today) / (1000*60*60*24));
-  if (diffDays >= 0 && diffDays <= 2) return "Emergency";
-  return null;
-};
-
-// ============================================================================
-// FREE FIRST SHIFT — COMPLETE REPLACEMENT PostView
-// ----------------------------------------------------------------------------
-// HOW TO MERGE:
-//   In App.js, select from the line   `function PostView() {`
-//   down to its closing brace `}` (the line just above
-//   `function DeleteAccountSection({ token, onDeleted }) {`)
-//   and replace that whole block with everything below this comment.
-//
-//   No Supabase schema change is required. Eligibility = "this signed-in
-//   user has never posted a shift" (one query on the shifts table), so it
-//   can't be double-claimed and needs no free_shift_used column.
-// ============================================================================
-
+// Listing fees are charged per day at a flat daily rate for the shift type.
+// There are no bundles, tiers, or volume discounts.
 function PostView() {
   const { user, setShowAuth } = useApp() || {};
   const navigate = useNavigate();
@@ -601,7 +536,8 @@ function PostView() {
     date_from:"", date_to:"",
     start_time:"09:00", end_time:"17:00", rate:"",
     type:"Standard", software:"Fred Dispense",
-    travel_paid:false, accommodation:false, notes:""
+    travel_paid:false, accommodation:false, notes:"",
+    termsAccepted:false,
   });
   const [step, setStep] = useState("form");
   const [error, setError] = useState("");
@@ -609,7 +545,7 @@ function PostView() {
   const [freeEligible, setFreeEligible] = useState(false);
   const [posting, setPosting] = useState(false);
 
-  // ── Free first shift eligibility: signed in + has never posted a shift ────
+  // Free first shift eligibility: signed in + has never posted a shift.
   useEffect(() => {
     const checkFreeEligibility = async () => {
       try {
@@ -625,7 +561,7 @@ function PostView() {
       } catch(e) { console.warn("Free shift eligibility check failed:", e); }
     };
     checkFreeEligibility();
-  }, [user?.id]); // re-check when the user signs in mid-session
+  }, [user?.id]);
 
   const set   = k => e => setForm(p=>({...p,[k]:e.target.value}));
   const check = k => e => setForm(p=>({...p,[k]:e.target.checked}));
@@ -637,9 +573,9 @@ function PostView() {
     setTypeAutoSet(!!detected);
   };
 
-  const days    = getDayCount(form.date_from, form.date_to);
-  const price   = getBundlePrice(days, form.type);
-  const saving  = getSaving(days, form.type);
+  const days      = getDayCount(form.date_from, form.date_to);
+  const dailyRate = DAILY_RATE[form.type] || DAILY_RATE.Standard;
+  const total     = getListingTotal(days, form.type);
 
   const handleContinue = () => {
     if (!form.pharmacy_name||!form.location||!form.date_from||!form.rate) {
@@ -655,9 +591,15 @@ function PostView() {
     const sessionUser = JSON.parse(localStorage.getItem("ss_user") || "null");
     const t = localStorage.getItem("ss_token");
 
+    if (!t || !sessionUser?.id) {
+      setError("Please sign in to post a shift.");
+      if (setShowAuth) setShowAuth(true);
+      return;
+    }
+
     const shiftPayload = {
-      owner_id: sessionUser?.id || "",
-      posted_by: sessionUser?.id || "",
+      owner_id: sessionUser.id,
+      posted_by: sessionUser.id,
       pharmacy_name: form.pharmacy_name,
       location: form.location,
       region: form.region,
@@ -674,10 +616,10 @@ function PostView() {
       status: "active",
       payment_status: freeEligible ? "free" : "paid",
     };
-    
-// ── FREE FIRST SHIFT: post directly to Supabase, no Stripe ─────────────
-    if (freeEligible && t && sessionUser?.id) {
-      if (posting) return; // guard against double-click double-insert
+
+    // ── FREE FIRST SHIFT: post directly to Supabase, no Stripe ──────────────
+    if (freeEligible) {
+      if (posting) return;
       setPosting(true);
       try {
         const res = await fetch(`${SUPA_URL}/rest/v1/shifts`, {
@@ -691,8 +633,6 @@ function PostView() {
           body: JSON.stringify(shiftPayload),
         });
         if (res.ok) {
-          // Notify matching pharmacists (email + native push) — same path paid shifts use.
-          // Not awaited: the owner shouldn't wait on the send.
           try {
             const inserted = await res.json();
             const newShift = Array.isArray(inserted) ? inserted[0] : inserted;
@@ -706,7 +646,7 @@ function PostView() {
           } catch (e) {
             console.warn("Could not read inserted shift:", e);
           }
-          setFreeEligible(false); // they've now posted a shift — no longer eligible
+          setFreeEligible(false);
           setStep("success");
         } else {
           const err = await res.text();
@@ -721,23 +661,31 @@ function PostView() {
       return;
     }
 
-    // ── PAID FLOW: existing Stripe redirect, unchanged ──────────────────────
-    try { localStorage.setItem("ss_pending_shift", JSON.stringify(shiftPayload)); } catch(e) {}
-    const refId = btoa(JSON.stringify(shiftPayload)).slice(0, 200);
-    const params = new URLSearchParams({ client_reference_id: refId });
-
-    let link;
-    if (days <= 1) link = STRIPE_PAYMENT_LINKS[form.type];
-    else if (days <= 3) link = BUNDLE_LINKS[3];
-    else if (days <= 5) link = BUNDLE_LINKS[5];
-    else if (days <= 8) link = BUNDLE_LINKS[8];
-    else if (days <= 11) link = BUNDLE_LINKS[11];
-    else if (days <= 14) link = BUNDLE_LINKS[14];
-    else if (days <= 17) link = BUNDLE_LINKS[17];
-    else if (days <= 20) link = BUNDLE_LINKS[20];
-    else link = BUNDLE_LINKS[30];
-
-    window.location.href = `${link}?${params}`;
+    // ── PAID FLOW: server-side Checkout Session, priced days × daily rate ────
+    if (posting) return;
+    setPosting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${t}`,
+        },
+        body: JSON.stringify({ shift: shiftPayload, origin: window.location.origin }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        setError(data.error || "Couldn't start checkout — please try again.");
+        setPosting(false);
+        return;
+      }
+      window.location.href = data.url;
+    } catch(e) {
+      console.warn("Checkout session error:", e);
+      setError("Network error — please check your connection and try again.");
+      setPosting(false);
+    }
   };
 
   const inputStyle = { width:"100%",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 14px",fontSize:14,color:T.white,fontFamily:"'Outfit',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:18 };
@@ -746,20 +694,20 @@ function PostView() {
   return (
     <div style={{ maxWidth:600,animation:"fadeUp 0.3s ease" }}>
       <div style={{ fontFamily:"'Playfair Display',serif",fontSize:28,color:T.white,marginBottom:6 }}>Post a Shift</div>
-      <div style={{ fontSize:14,color:T.dim,marginBottom:28,lineHeight:1.6 }}>
-        Post a single shift or a multi-day block. Posting fee: <span style={{color:T.amberText}}>$9–$19 AUD</span> per shift, with bundle discounts for multiple days.
+      <div style={{ fontSize:14,color:T.dim,marginBottom:20,lineHeight:1.6 }}>
+        Advertise a single shift or a multi-day block. The listing fee is charged per day at a flat daily rate — no bundles, no commission, no subscription.
       </div>
 
-      <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:12 }}>
-        {[["1 day","From $9"],["3 days","$20"],["5 days","$30"],["8 days","$45"]].map(([l,p])=>(
-          <div key={l} style={{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:10,padding:"10px 8px",textAlign:"center" }}>
-            <div style={{ fontSize:13,fontWeight:700,color:T.white,marginBottom:2 }}>{l}</div>
-            <div style={{ fontSize:11,color:T.amber,fontWeight:600 }}>{p}</div>
+      {/* Daily rate card — rates vary by shift type only, never by quantity */}
+      <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12 }}>
+        {SHIFT_TYPES.map(t=>(
+          <div key={t} style={{ background:form.type===t?"rgba(240,165,0,0.06)":T.bgCard,border:`1px solid ${form.type===t?T.amber:T.border}`,borderRadius:10,padding:"10px 8px",textAlign:"center",transition:"all 0.15s" }}>
+            <div style={{ fontSize:13,fontWeight:700,color:T.white,marginBottom:2 }}>{t}</div>
+            <div style={{ fontSize:11,color:T.amber,fontWeight:600 }}>${DAILY_RATE[t]} / day</div>
           </div>
         ))}
       </div>
 
-      {/* ── NEW: Free first shift banner (hidden once posted) ── */}
       {freeEligible && step !== "success" && (
         <div style={{ background:"rgba(0,229,176,0.06)",border:`1px solid ${T.mint}`,borderRadius:12,padding:"14px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:12,animation:"fadeUp 0.3s ease" }}>
           <span style={{ fontSize:22 }}>🎁</span>
@@ -769,7 +717,7 @@ function PostView() {
           </div>
         </div>
       )}
-{/* Teaser for visitors who aren't signed in */}
+
       {!user && (
         <div style={{ background:"rgba(0,229,176,0.06)",border:`1px dashed ${T.mint}`,borderRadius:12,padding:"12px 20px",marginBottom:20,fontSize:13,color:T.dim }}>
           🎁 <span style={{color:T.mintText,fontWeight:700}}>New to ScriptShift?</span> Your first shift posting is free — sign in or register when you post to claim it.
@@ -801,20 +749,19 @@ function PostView() {
               </div>
             </div>
             {days > 0 && (
-              <div style={{ marginTop:12,padding:"8px 12px",background:days>1?"rgba(240,165,0,0.08)":"transparent",borderRadius:8,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                <span style={{ fontSize:13,color:T.dim }}>{days} shift{days>1?"s":""} selected</span>
-                <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-                  {!freeEligible && saving>0 && <span style={{ fontSize:12,color:T.mint,fontWeight:600 }}>Save ${saving} AUD</span>}
-                  {freeEligible
-                    ? <span style={{ fontSize:15,fontWeight:700,color:T.mintText }}><s style={{color:T.dimmer,fontWeight:400,marginRight:6}}>{price}</s>FREE</span>
-                    : <span style={{ fontSize:15,fontWeight:700,color:T.amber }}>{price}</span>}
-                </div>
+              <div style={{ marginTop:12,padding:"8px 12px",background:"rgba(240,165,0,0.06)",borderRadius:8,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+                <span style={{ fontSize:13,color:T.dim }}>
+                  {days} listing day{days>1?"s":""} × ${dailyRate}
+                </span>
+                {freeEligible
+                  ? <span style={{ fontSize:15,fontWeight:700,color:T.mintText }}><s style={{color:T.dimmer,fontWeight:400,marginRight:6}}>{fmtAud(total)}</s>FREE</span>
+                  : <span style={{ fontSize:15,fontWeight:700,color:T.amber }}>{fmtAud(total)}</span>}
               </div>
             )}
           </div>
 
           <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14 }}>
-            <div><label style={labelStyle}>Shift Type {typeAutoSet && <span style={{color:T.amber,fontWeight:600,fontSize:10,letterSpacing:0,textTransform:"none",marginLeft:6}}>⚡ Auto-detected</span>}</label><select style={inputStyle} value={form.type} onChange={e=>{set("type")(e);setTypeAutoSet(false);}}>{["Standard","Emergency","Weekend","Evening"].map(t=><option key={t}>{t}</option>)}</select></div>
+            <div><label style={labelStyle}>Shift Type {typeAutoSet && <span style={{color:T.amber,fontWeight:600,fontSize:10,letterSpacing:0,textTransform:"none",marginLeft:6}}>⚡ Auto-detected</span>}</label><select style={inputStyle} value={form.type} onChange={e=>{set("type")(e);setTypeAutoSet(false);}}>{SHIFT_TYPES.map(t=><option key={t}>{t}</option>)}</select></div>
             <div><label style={labelStyle}>Rate ($/hr) *</label><input type="number" style={inputStyle} placeholder="85" value={form.rate} onChange={set("rate")} /></div>
           </div>
 
@@ -832,7 +779,7 @@ function PostView() {
           <textarea style={{...inputStyle,minHeight:72,resize:"vertical"}} placeholder="Script volume, services, parking…" value={form.notes} onChange={set("notes")} />
 
           <button onClick={handleContinue} style={{ background:freeEligible?T.mint:T.amber,color:"#000",border:"none",borderRadius:9,padding:"13px 32px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
-            {freeEligible ? "Continue — First Shift Free →" : `Continue to Payment (${days>0?price:SHIFT_PRICES[form.type]}) →`}
+            {freeEligible ? "Continue — First Shift Free →" : `Continue to Payment (${days>0?fmtAud(total):`$${dailyRate}/day`}) →`}
           </button>
         </div>
       )}
@@ -860,22 +807,20 @@ function PostView() {
           </div>
           <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",background:freeEligible?"rgba(0,229,176,0.06)":"rgba(240,165,0,0.06)",border:`1px solid ${freeEligible?"rgba(0,229,176,0.25)":"rgba(240,165,0,0.2)"}`,borderRadius:10,padding:"16px 20px",marginBottom:12 }}>
             <div>
-              <div style={{ fontSize:13,color:T.dim,marginBottom:3 }}>{freeEligible?"First shift posting — welcome offer":days>1?`${days}-day block posting fee`:`${form.type} shift posting fee`}</div>
-              <div style={{ fontSize:12,color:T.dimmer }}>One-time · No commission · No subscription</div>
+              <div style={{ fontSize:13,color:T.dim,marginBottom:3 }}>
+                {freeEligible
+                  ? "First shift posting — welcome offer"
+                  : `${form.type} shift listing — ${days} day${days!==1?"s":""} × $${dailyRate}`}
+              </div>
+              <div style={{ fontSize:12,color:T.dimmer }}>Per-day listing fee · No commission · No subscription</div>
             </div>
             <div style={{ fontFamily:"'Playfair Display',serif",fontSize:28,color:freeEligible?T.mintText:T.white }}>
-              {freeEligible ? <><s style={{fontSize:16,color:T.dimmer,marginRight:8}}>{price}</s>FREE</> : price}
+              {freeEligible ? <><s style={{fontSize:16,color:T.dimmer,marginRight:8}}>{fmtAud(total)}</s>FREE</> : fmtAud(total)}
             </div>
           </div>
-          {!freeEligible && saving>0 && (
-            <div style={{ background:"rgba(0,229,176,0.06)",border:`1px solid rgba(0,229,176,0.2)`,borderRadius:8,padding:"8px 16px",marginBottom:12,fontSize:13,color:T.mintText,fontWeight:600 }}>
-              🎉 Bundle discount applied — you're saving ${saving} AUD!
-            </div>
-          )}
           <div style={{ fontSize:12,color:T.dimmer,marginBottom:10 }}>
             {freeEligible ? "🎁 No payment required for your first shift" : "🔒 Redirects to Stripe secure checkout · Australian GST applies"}
           </div>
-          {/* Terms & Refund Policy checkbox */}
           <div style={{ background:"rgba(255,255,255,0.03)",border:`1px solid ${T.border}`,borderRadius:10,padding:"14px 16px",marginBottom:20 }}>
             <label style={{ display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer" }}>
               <input
@@ -886,10 +831,10 @@ function PostView() {
               />
               <span style={{ fontSize:12,color:T.dim,lineHeight:1.6 }}>
                 I have read and agree to the{" "}
-                <a href="/terms-of-service.html" target="_blank" style={{ color:T.amber,textDecoration:"underline" }}>Terms of Service</a>
+                <a href="/terms-of-service.html" target="_blank" rel="noreferrer" style={{ color:T.amber,textDecoration:"underline" }}>Terms of Service</a>
                 {" "}and{" "}
-                <a href="/refund-policy.html" target="_blank" style={{ color:T.amber,textDecoration:"underline" }}>Refund Policy</a>.
-                {" "}I understand that shift posting fees are non-refundable once payment is processed, and that it is my responsibility to verify pharmacist AHPRA registration before engagement.
+                <a href="/refund-policy.html" target="_blank" rel="noreferrer" style={{ color:T.amber,textDecoration:"underline" }}>Refund Policy</a>.
+                {" "}I understand that shift listing fees are non-refundable once payment is processed, and that it is my responsibility to verify pharmacist AHPRA registration before engagement.
               </span>
             </label>
           </div>
@@ -899,13 +844,12 @@ function PostView() {
               onClick={()=>{ if(!form.termsAccepted){setError("Please read and accept the Terms of Service and Refund Policy to continue.");return;} setError(""); handlePay(); }}
               disabled={posting}
               style={{ flex:2,padding:"12px 0",borderRadius:8,border:"none",background:form.termsAccepted?(freeEligible?T.mint:T.stripe):"#333",color:form.termsAccepted?(freeEligible?"#000":"#fff"):"#666",fontSize:14,fontWeight:700,cursor:form.termsAccepted&&!posting?"pointer":"not-allowed",fontFamily:"'Outfit',sans-serif",transition:"all 0.2s" }}
-            >{posting ? "Posting…" : freeEligible ? "🎁 Post Free Shift →" : `Pay ${price} via Stripe →`}</button>
+            >{posting ? "Processing…" : freeEligible ? "🎁 Post Free Shift →" : `Pay ${fmtAud(total)} via Stripe →`}</button>
           </div>
           {error && <div style={{ marginTop:12,fontSize:13,color:T.coral }}>{error}</div>}
         </div>
       )}
 
-      {/* ── NEW: Success step (free shift posted) ── */}
       {step==="success" && (
         <div style={{ background:T.bgCard,borderRadius:14,padding:"40px 28px",border:`1px solid ${T.mint}`,textAlign:"center",animation:"fadeUp 0.3s ease" }}>
           <div style={{ fontSize:44,marginBottom:14 }}>🎉</div>
@@ -1001,6 +945,7 @@ function DeleteAccountSection({ token, onDeleted }) {
     </div>
   );
 }
+
 // ── PROFILE VIEW ──────────────────────────────────────────────────────────────
 function ProfileView({ user, token, onSignOut }) {
   const meta = user?.user_metadata || {};
@@ -1021,7 +966,6 @@ function ProfileView({ user, token, onSignOut }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Update auth user metadata
       await fetch(SUPA_URL + "/auth/v1/user", {
         method: "PUT",
         headers: {
@@ -1031,7 +975,6 @@ function ProfileView({ user, token, onSignOut }) {
         },
         body: JSON.stringify({ data: form })
       });
-      // Update ALL fields in profiles table with session token
       await fetch(SUPA_URL + "/rest/v1/profiles?id=eq." + user.id, {
         method: "PATCH",
         headers: {
@@ -1107,7 +1050,7 @@ function ProfileView({ user, token, onSignOut }) {
               <div style={{ fontSize:12,fontWeight:700,color:T.amber,marginBottom:4,letterSpacing:0.5 }}>🔔 REAL-TIME ALERTS ACTIVE</div>
               <div style={{ fontSize:13,color:T.dim,lineHeight:1.6 }}>You'll be notified when new shifts match your location and software preferences.</div>
             </div>
-           <DeleteAccountSection token={token} onDeleted={onSignOut} />
+            <DeleteAccountSection token={token} onDeleted={onSignOut} />
             <button onClick={onSignOut} style={{ width:"100%",padding:"10px 0",borderRadius:8,border:`1px solid ${T.border}`,background:"transparent",color:T.dim,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
               Sign Out
             </button>
@@ -1123,7 +1066,7 @@ function ProfileView({ user, token, onSignOut }) {
             <div style={{marginBottom:10}}>
               <label style={lblSt}>Dispensing Software (select all you know)</label>
               <div style={{ display:"flex",flexWrap:"wrap",gap:8,marginTop:6 }}>
-                {(SOFTWARE_OPTIONS.length ? SOFTWARE_OPTIONS : ["Fred Dispense","Minfos","LOTS","Corum Health","Other"]).map(sw => {
+                {SOFTWARE_OPTIONS.map(sw => {
                   const selected = (typeof form.software === "string" ? form.software.split(",").map(s=>s.trim()) : []).includes(sw);
                   return (
                     <div key={sw} onClick={()=>{
@@ -1166,13 +1109,13 @@ function ProfileView({ user, token, onSignOut }) {
 const LEGAL_CONTENT = {
   terms: {
     title: "Terms of Service",
-    updated: "Effective 7 June 2026 — ScriptShift Technologies Pty Ltd (ABN 21 698 500 542)",
+    updated: "Effective 17 July 2026 — ScriptShift Technologies Pty Ltd (ABN 21 698 500 542)",
     sections: [
-      { h: "1. About ScriptShift WA", p: "ScriptShift WA is an online marketplace operated by ScriptShift Technologies Pty Ltd (ABN 21 698 500 542) that connects pharmacy owners with locum pharmacists in Western Australia. By using our platform at scriptshiftwa.com.au, you agree to these Terms of Service." },
+      { h: "1. About ScriptShift WA", p: "ScriptShift WA is an online marketplace operated by ScriptShift Technologies Pty Ltd (ABN 21 698 500 542) that connects pharmacy owners with locum pharmacists in Western Australia. Shifts advertised on the platform are worked in person at a physical pharmacy premises in Western Australia. By using our platform at scriptshiftwa.com.au, you agree to these Terms of Service." },
       { h: "2. Who Can Use ScriptShift WA", p: "Pharmacy owners must be the owner, manager or authorised representative of a pharmacy operating in Western Australia and hold all necessary licences under the Pharmacy Act 2010 (WA). Pharmacists must be currently registered with AHPRA with an active, unconditional registration. You are responsible for maintaining the confidentiality of your account credentials." },
-      { h: "3. Shift Posting Fees", p: "Posting fees: Standard $9 AUD · Evening $9 AUD · Weekend $14 AUD · Emergency $19 AUD · 3-Day Bundle $20 AUD · 5-Day Bundle $30 AUD · 8-Day Bundle $45 AUD (all GST inclusive). New pharmacy owners may be eligible for one complimentary first shift posting, offered at ScriptShift's discretion and subject to change or withdrawal at any time. Fees are non-refundable once a shift is published. We reserve the right to update fees with 7 days' notice." },
+      { h: "3. Shift Listing Fees", p: "Pharmacists use ScriptShift WA free of charge. Pharmacy owners pay a listing fee to advertise a shift. The fee is charged per calendar day the shift is advertised for, at a flat daily rate determined by shift type: Standard $9 AUD per day · Weekend $14 AUD per day · Emergency $19 AUD per day (all GST inclusive). The total is the daily rate multiplied by the number of listing days. There are no bundles, tiers, volume discounts, subscriptions or commissions. The fee purchases advertising of a real-world employment engagement; it does not unlock any feature or content on the platform. New pharmacy owners may be eligible for one complimentary first shift listing, offered at ScriptShift's discretion and subject to change or withdrawal at any time. Fees are non-refundable once a shift is published. We reserve the right to update fees with 7 days' notice." },
       { h: "4. AHPRA Verification", p: "Pharmacists must provide their valid AHPRA registration number during sign-up. By providing this number, you confirm your registration is current and unconditional. ScriptShift WA displays your AHPRA number to pharmacy owners for verification purposes. It is the pharmacy owner's responsibility to confirm registration status before engaging a pharmacist." },
-      { h: "5. The Relationship Between Users", p: "ScriptShift WA is a marketplace platform only. We are not a party to any employment or contractor agreement between pharmacy owners and pharmacists. We are not responsible for the conduct of any user, accuracy of shift details, disputes arising from engagements, or payment of wages. Users are solely responsible for ensuring compliance with all applicable laws including the Pharmacy Industry Award 2020." },
+      { h: "5. The Relationship Between Users", p: "ScriptShift WA is a marketplace platform only. We are not a party to any employment or contractor agreement between pharmacy owners and pharmacists. We are not responsible for the conduct of any user, accuracy of shift details, disputes arising from engagements, or payment of wages. Wages for shifts worked are agreed and paid directly between the pharmacy owner and the pharmacist, outside the platform. Users are solely responsible for ensuring compliance with all applicable laws including the Pharmacy Industry Award 2020." },
       { h: "6. Prohibited Conduct", p: "Users must not: provide false information including false AHPRA numbers; post shifts for pharmacies they are not authorised to represent; use the platform unlawfully; circumvent our payment system; or harass other users. Breach may result in immediate account suspension." },
       { h: "7. Limitation of Liability", p: "To the maximum extent permitted by Australian law, ScriptShift Technologies Pty Ltd is not liable for any indirect, incidental, special or consequential loss arising from your use of the platform. Our total liability is limited to the amount you paid us in the 3 months preceding any claim." },
       { h: "8. Governing Law", p: "These Terms are governed by the laws of Western Australia and the Commonwealth of Australia. Any disputes will be subject to the exclusive jurisdiction of the courts of Western Australia." },
@@ -1181,11 +1124,11 @@ const LEGAL_CONTENT = {
   },
   privacy: {
     title: "Privacy Policy",
-    updated: "Effective 7 June 2026 — ScriptShift Technologies Pty Ltd (ABN 21 698 500 542)",
+    updated: "Effective 17 July 2026 — ScriptShift Technologies Pty Ltd (ABN 21 698 500 542)",
     sections: [
       { h: "1. Our Commitment", p: "ScriptShift Technologies Pty Ltd is committed to protecting your personal information in accordance with the Australian Privacy Act 1988 (Cth) and the Australian Privacy Principles (APPs)." },
       { h: "2. Information We Collect", p: "Pharmacists: full name, email, phone, AHPRA registration number, dispensing software skills, preferred regions, minimum rate. Pharmacy owners: pharmacy name, location, shift details, payment info (processed by Stripe — we do not store card details). We may also collect browser type and IP address." },
-      { h: "3. How We Use Your Information", p: "To create and manage your account; display your AHPRA number to pharmacy owners for verification; match pharmacists with shifts; process payments via Stripe; send shift match notifications; and comply with legal obligations." },
+      { h: "3. How We Use Your Information", p: "To create and manage your account; display your AHPRA number to pharmacy owners for verification; match pharmacists with shifts; process listing fee payments via Stripe; send shift match notifications; and comply with legal obligations." },
       { h: "4. Disclosure", p: "We share your information only with: pharmacy owners (name, AHPRA, skills, regions when you apply); Stripe (payment processing); and government authorities if required by law. We do not sell your personal information." },
       { h: "5. AHPRA Number", p: "Your AHPRA number is stored securely and displayed only to pharmacy owners on our platform for verification purposes. It is not publicly searchable." },
       { h: "6. Data Storage & Security", p: "Your data is stored securely using Supabase (servers in Sydney, Australia). We use HTTPS encryption and access controls. No internet transmission is completely secure." },
@@ -1196,12 +1139,12 @@ const LEGAL_CONTENT = {
   },
   refund: {
     title: "Refund Policy",
-    updated: "Effective 7 June 2026 — ScriptShift Technologies Pty Ltd (ABN 21 698 500 542)",
+    updated: "Effective 17 July 2026 — ScriptShift Technologies Pty Ltd (ABN 21 698 500 542)",
     sections: [
-      { h: "1. Posting Fees", p: "Shift posting fees are non-refundable once a shift is published and visible to pharmacists." },
-      { h: "2. When We May Issue a Refund", p: "We will consider refunds for: (a) Technical errors where your shift was not published despite successful payment — we will publish the shift or refund in full; (b) Duplicate charges due to a system error — refunded within 5 business days; (c) Platform unavailability for more than 24 consecutive hours — we will offer a credit towards a future posting." },
+      { h: "1. Listing Fees", p: "Shift listing fees are non-refundable once a shift is published and visible to pharmacists." },
+      { h: "2. When We May Issue a Refund", p: "We will consider refunds for: (a) Technical errors where your shift was not published despite successful payment — we will publish the shift or refund in full; (b) Duplicate charges due to a system error — refunded within 5 business days; (c) Platform unavailability for more than 24 consecutive hours — we will offer a credit towards a future listing." },
       { h: "3. How to Request a Refund", p: "Email hello@scriptshiftwa.com.au within 7 days of payment with your registered email, payment date, pharmacy name, shift date and reason. We respond within 3 business days." },
-      { h: "4. Cancellations & No-Shows", p: "If a pharmacy owner cancels after a pharmacist is engaged, the posting fee is not refundable. If a pharmacist no-shows, the posting fee is not refundable. These matters are between the pharmacy owner and pharmacist." },
+      { h: "4. Cancellations & No-Shows", p: "If a pharmacy owner cancels after a pharmacist is engaged, the listing fee is not refundable. If a pharmacist no-shows, the listing fee is not refundable. These matters are between the pharmacy owner and pharmacist." },
       { h: "5. Consumer Guarantees", p: "Nothing in this policy excludes, restricts or modifies any consumer guarantee, right or remedy under the Australian Consumer Law." },
       { h: "6. Payment Processing", p: "Approved refunds are credited to your original payment method within 5–10 business days depending on your bank. All payments are processed by Stripe." },
       { h: "7. Contact", p: "hello@scriptshiftwa.com.au — ScriptShift Technologies Pty Ltd" },
@@ -1427,7 +1370,6 @@ function ApplicantCard({ app, shift, onUpdateStatus }) {
     if (profile || loadingProfile) { setExpanded(!expanded); return; }
     setLoadingProfile(true);
     try {
-      // FIX Bug 1: use the stored session token (not anon key) so RLS allows the read
       const token = localStorage.getItem("ss_token") || SUPA_KEY;
       const res = await fetch(
         SUPA_URL + "/rest/v1/profiles?id=eq." + app.pharmacist_id + "&select=*",
@@ -1436,7 +1378,6 @@ function ApplicantCard({ app, shift, onUpdateStatus }) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         const p = data[0];
-        // Also merge from app.pharmacist_metadata if profile columns are missing
         const meta = app.pharmacist_metadata || {};
         setProfile({
           ...p,
@@ -1566,7 +1507,6 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
   const [loading, setLoading] = useState(true);
 
   const myShifts = shifts.filter(s => s.owner_id === user.id);
-  // Only show applications for active shifts with future/today dates
   const myActiveShiftIds = new Set(
     myShifts
       .filter(s => {
@@ -1657,6 +1597,7 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
       loadShifts();
     } catch(e) { console.warn(e); }
   };
+
   return (
     <div style={{ animation:"fadeUp 0.3s ease" }}>
       <div style={{ fontFamily:"'Playfair Display',serif",fontSize:28,color:T.white,marginBottom:6 }}>Applications Received</div>
@@ -1671,7 +1612,6 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
         </div>
       ) : (
         <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
-          {/* Group by shift and show Close Shift button per shift */}
           {[...new Set(apps.filter(app => myActiveShiftIds.has(app.shift_id)).map(a => a.shift_id))].map(shiftId => {
             const shift = myShifts.find(s => s.id === shiftId);
             const shiftApps = apps.filter(a => a.shift_id === shiftId);
@@ -1684,15 +1624,15 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
                       <span style={{ fontSize:11,color:T.dim,fontWeight:400,marginLeft:8 }}>{shiftApps.length} application{shiftApps.length!==1?"s":""}</span>
                     </div>
                     <div style={{ display:"flex", gap:8 }}>
-        <button onClick={() => closeShift(shiftId)}
-        style={{ fontSize:11,color:T.mint,background:"transparent",border:`1px solid ${T.mint}`,borderRadius:6,padding:"4px 12px",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:600 }}>
-✓ Mark as Filled
-  </button>
-  <button onClick={() => withdrawShift(shiftId)}
-    style={{ fontSize:11,color:T.coral,background:"transparent",border:`1px solid ${T.coral}`,borderRadius:6,padding:"4px 12px",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:600 }}>
-    ✕ Withdraw
-  </button>
-</div>
+                      <button onClick={() => closeShift(shiftId)}
+                        style={{ fontSize:11,color:T.mint,background:"transparent",border:`1px solid ${T.mint}`,borderRadius:6,padding:"4px 12px",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:600 }}>
+                        ✓ Mark as Filled
+                      </button>
+                      <button onClick={() => withdrawShift(shiftId)}
+                        style={{ fontSize:11,color:T.coral,background:"transparent",border:`1px solid ${T.coral}`,borderRadius:6,padding:"4px 12px",cursor:"pointer",fontFamily:"'Outfit',sans-serif",fontWeight:600 }}>
+                        ✕ Withdraw
+                      </button>
+                    </div>
                   </div>
                 )}
                 {shiftApps.map((app,i) => (
@@ -1708,8 +1648,7 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
 }
 
 // ============================================================================
-// NEW: Shared app context — lets every route access the same state that used
-// to live directly inside App(), without prop-drilling through the router.
+// Shared app context
 // ============================================================================
 const insertProfileFromMeta = async (userData, token) => {
   const meta = userData.user_metadata || {};
@@ -1755,6 +1694,7 @@ const insertProfileFromMeta = async (userData, token) => {
     body: JSON.stringify(payload),
   });
 };
+
 const AppContext = createContext(null);
 const useApp = () => useContext(AppContext);
 
@@ -1781,74 +1721,49 @@ function AppProvider({ children }) {
         const t = localStorage.getItem("ss_token");
         const u = localStorage.getItem("ss_user");
         if (t && u) { setToken(t); setUser(JSON.parse(u)); }
-        // Handle email confirmation redirect
-      const urlParams = new URLSearchParams(window.location.search);
-      const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
-      const accessToken = hashParams.get('access_token') || urlParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token') || urlParams.get('refresh_token');
-      const type = hashParams.get('type') || urlParams.get('type');
 
-      if (accessToken && type === 'signup') {
-        try {
-          // Fetch user with the confirmed token
-          const userRes = await fetch(`${SUPA_URL}/auth/v1/user`, {
-            headers: { "apikey": SUPA_KEY, "Authorization": `Bearer ${accessToken}` }
-          });
-          const userData = await userRes.json();
-          if (userData.id) {
-            localStorage.setItem("ss_token", accessToken);
-            localStorage.setItem("ss_user", JSON.stringify(userData));
-            if (refreshToken) localStorage.setItem("ss_refresh_token", refreshToken);
-            setToken(accessToken);
-            setUser(userData);
-            // Insert profile if not already done
-            await insertProfileFromMeta(userData, accessToken);
-            // Clean up URL
-            navigate("/browse");
-            setTimeout(() => showToast("✓ Email confirmed! Welcome to ScriptShift WA."), 500);
-          }
-        } catch(e) { console.warn("Auth callback error:", e); }
-      }
+        // Handle email confirmation redirect
+        const urlParams = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+        const accessToken = hashParams.get('access_token') || urlParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token') || urlParams.get('refresh_token');
+        const type = hashParams.get('type') || urlParams.get('type');
+
+        if (accessToken && type === 'signup') {
+          try {
+            const userRes = await fetch(`${SUPA_URL}/auth/v1/user`, {
+              headers: { "apikey": SUPA_KEY, "Authorization": `Bearer ${accessToken}` }
+            });
+            const userData = await userRes.json();
+            if (userData.id) {
+              localStorage.setItem("ss_token", accessToken);
+              localStorage.setItem("ss_user", JSON.stringify(userData));
+              if (refreshToken) localStorage.setItem("ss_refresh_token", refreshToken);
+              setToken(accessToken);
+              setUser(userData);
+              await insertProfileFromMeta(userData, accessToken);
+              navigate("/browse");
+              setTimeout(() => showToast("✓ Email confirmed! Welcome to ScriptShift WA."), 500);
+            }
+          } catch(e) { console.warn("Auth callback error:", e); }
+        }
+
+        // Shift rows for paid listings are now written server-side by the Stripe
+        // webhook once payment actually succeeds. The client no longer holds a
+        // pending shift in localStorage, so nothing is inserted here.
+        //
+        // Clear any stale ss_pending_shift left over from the previous
+        // Payment-Link flow, so an abandoned checkout can't post a free shift on
+        // the next page load.
+        try { localStorage.removeItem("ss_pending_shift"); } catch(e) {}
 
         const params = new URLSearchParams(window.location.search);
-        const isPaymentSuccess = params.get("payment") === "success";
-        const pending = JSON.parse(localStorage.getItem("ss_pending_shift") || "null");
-
-        if (pending && t && u) {
-          try {
-            const sessionUser = JSON.parse(u);
-            const shiftPayload = { ...pending, owner_id: sessionUser.id };
-            const res = await fetch(SUPA_URL + "/rest/v1/shifts", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "apikey": SUPA_KEY,
-                "Authorization": "Bearer " + t,
-                "Prefer": "return=minimal",
-              },
-              body: JSON.stringify(shiftPayload),
-            });
-            if (res.ok) {
-              localStorage.removeItem("ss_pending_shift");
-              window.history.replaceState({}, "", window.location.pathname);
-              setTimeout(() => setToast("🎉 Payment confirmed! Your shift is now live."), 800);
-            } else {
-              const err = await res.text();
-              console.warn("Shift insert failed:", err);
-              if (isPaymentSuccess) {
-                navigate("/browse"); 
-                setTimeout(() => setToast("⚠ Shift save failed — " + err), 800);
-              }
-            }
-          } catch(e) { console.warn("Pending shift insert error:", e); }
-        } else if (pending && (!t || !u)) {
-          console.warn("Pending shift found but no session — will retry on next login");
-          if (isPaymentSuccess) {
-            window.history.replaceState({}, window.location.pathname);
-            setTimeout(() => setToast("⚠ Please sign in to complete your shift posting."), 800);
-          }
-        } else if (isPaymentSuccess) {
+        if (params.get("payment") === "success") {
           window.history.replaceState({}, "", window.location.pathname);
+          setTimeout(() => setToast("🎉 Payment confirmed! Your shift is now live."), 800);
+        } else if (params.get("payment") === "cancelled") {
+          window.history.replaceState({}, "", window.location.pathname);
+          setTimeout(() => setToast("Checkout cancelled — your shift was not posted."), 500);
         }
 
         const savedApplied = JSON.parse(localStorage.getItem("ss_applied") || "[]");
@@ -1894,28 +1809,8 @@ function AppProvider({ children }) {
       try { localStorage.setItem("ss_refresh_token", data.refresh_token); } catch(e) {}
     }
     setShowAuth(false);
-    try {
-      const pending = JSON.parse(localStorage.getItem("ss_pending_shift") || "null");
-      if (pending && data.access_token && data.user?.id) {
-        const res = await fetch(SUPA_URL + "/rest/v1/shifts", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": SUPA_KEY,
-            "Authorization": "Bearer " + data.access_token,
-            "Prefer": "return=minimal",
-          },
-          body: JSON.stringify({ ...pending, owner_id: data.user.id }),
-        });
-        if (res.ok) {
-          localStorage.removeItem("ss_pending_shift");
-          showToast("🎉 Shift posted successfully!");
-          return;
-        }
-      }
-    } catch(e) { console.warn("Post-login shift insert error:", e); }
     navigate("/browse");
-showToast("✓ Welcome to ScriptShift WA!");
+    showToast("✓ Welcome to ScriptShift WA!");
   };
 
   const refreshSession = async () => {
@@ -2009,7 +1904,7 @@ showToast("✓ Welcome to ScriptShift WA!");
 }
 
 // ============================================================================
-// NEW: /for-pharmacists landing page
+// /for-pharmacists landing page
 // ============================================================================
 function ForPharmacists() {
   const s = {
@@ -2033,12 +1928,12 @@ function ForPharmacists() {
   <div style={s.page}>
     <Helmet>
       <title>Find Locum Pharmacist Shifts in WA | ScriptShift WA</title>
-      <meta name="description" content="Browse and claim locum shifts across Western Australia. AHPRA-registered pharmacists only." />
+      <meta name="description" content="Browse and claim locum shifts across Western Australia. AHPRA-registered pharmacists only. Always free for pharmacists." />
       <link rel="canonical" href="https://www.scriptshiftwa.com.au/for-pharmacists" />
     </Helmet>
     <section style={s.hero}>
         <h1 style={s.h1}>Locum pharmacist shifts across Western Australia — on your terms.</h1>
-        <p style={s.sub}>ScriptShift WA is the shift marketplace built for AHPRA-registered pharmacists in WA. Browse available shifts, set your availability, and get paid for the work you choose.</p>
+        <p style={s.sub}>ScriptShift WA is the shift marketplace built for AHPRA-registered pharmacists in WA. Browse available shifts, set your availability, and get paid for the work you choose. Free for pharmacists — always.</p>
         <Link to="/browse" style={s.cta}>Create your free profile</Link>
       </section>
 
@@ -2064,6 +1959,7 @@ function ForPharmacists() {
         <h2 style={s.h2}>Why pharmacists choose ScriptShift WA</h2>
         <ul style={s.list}>
           {[
+            ["Free for pharmacists.","Browsing, applying, and managing your profile costs nothing — there are no fees on the pharmacist side, ever."],
             ["Work when you want.","Pick up single shifts or blocks — no lock-in, no agency fees."],
             ["WA-specific.","Built for the WA pharmacy landscape, including Fred Dispense, Minfos, and WA Schedule 8 permit requirements."],
             ["Full shift visibility.","Know the pharmacy, the software, the hours, and the rate before you commit."],
@@ -2087,7 +1983,7 @@ function ForPharmacists() {
 }
 
 // ============================================================================
-// NEW: /for-pharmacy-owners landing page
+// /for-pharmacy-owners landing page
 // ============================================================================
 function ForPharmacyOwners() {
   const s = {
@@ -2106,18 +2002,37 @@ function ForPharmacyOwners() {
     li:{ padding:"12px 0 12px 28px",borderBottom:`1px solid ${T.border}`,position:"relative",lineHeight:1.6,color:T.dim },
     finalCta:{ textAlign:"center",padding:"48px 24px",background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:16,marginTop:20 },
     ctaGroup:{ display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap",marginTop:20 },
+    priceRow:{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,maxWidth:560,margin:"0 auto" },
+    priceCard:{ background:T.bgCard,border:`1px solid ${T.border}`,borderRadius:12,padding:"18px 12px",textAlign:"center" },
   };
  return (
   <div style={s.page}>
     <Helmet>
       <title>Hire a Locum Pharmacist in WA | ScriptShift WA</title>
-      <meta name="description" content="Post locum pharmacist shifts and find AHPRA-registered cover across Western Australia. First shift post free for new pharmacy owners." />
+      <meta name="description" content="Post locum pharmacist shifts and find AHPRA-registered cover across Western Australia. Listing fees from $9 per day. First shift free for new pharmacy owners." />
       <link rel="canonical" href="https://www.scriptshiftwa.com.au/for-pharmacy-owners" />
     </Helmet>
     <section style={s.hero}>
        <h1 style={s.h1}>Find a qualified locum pharmacist in WA — your first shift post is free.</h1>
         <p style={s.sub}>ScriptShift WA connects pharmacy owners and managers with AHPRA-registered locum pharmacists across Western Australia. Post a shift in minutes, fill it fast — and your first posting is on us. No payment details required.</p>
         <Link to="/post" style={s.cta}>Post your first shift free</Link>
+      </section>
+
+      <section style={s.section}>
+        <h2 style={s.h2}>Simple per-day pricing</h2>
+        <p style={{...s.sub,marginBottom:24}}>You pay a listing fee for each day your shift is advertised. No bundles, no commission, no subscription — just the daily rate multiplied by the number of days.</p>
+        <div style={s.priceRow}>
+          {SHIFT_TYPES.map(t=>(
+            <div key={t} style={s.priceCard}>
+              <div style={{ fontSize:15,fontWeight:700,color:T.white,marginBottom:4 }}>{t}</div>
+              <div style={{ fontFamily:"'Playfair Display',serif",fontSize:26,color:T.amber,lineHeight:1 }}>${DAILY_RATE[t]}</div>
+              <div style={{ fontSize:11,color:T.dimmer,marginTop:4 }}>per listing day</div>
+            </div>
+          ))}
+        </div>
+        <p style={{ textAlign:"center",fontSize:12,color:T.dimmer,marginTop:16 }}>
+          Example: a 3-day standard block is 3 × $9 = $27 AUD. All prices GST inclusive.
+        </p>
       </section>
 
       <section style={s.section}>
@@ -2146,7 +2061,7 @@ function ForPharmacyOwners() {
             ["No agency middlemen.","Connect directly with locum pharmacists — no commission markups, no phone tag with a recruiter."],
             ["AHPRA-verified pharmacists only.","Every pharmacist on the platform has current, confirmed registration."],
             ["Fast turnaround.","Post an urgent gap today and have it filled within hours for most Perth metro locations."],
-            ["Transparent pricing.","Set your own rate. No hidden fees on the pharmacy side."],
+            ["Transparent pricing.","A flat daily listing fee. You set the pharmacist's hourly rate. No hidden fees, no commission."],
             ["WA-specific platform.","Pharmacists listed understand WA Poisons Act requirements, S8 permit access, and local dispensing software."],
           ].map(([b,d])=>(
             <li key={b} style={s.li}><strong style={{color:T.white}}>{b}</strong> {d}</li>
@@ -2167,7 +2082,7 @@ function ForPharmacyOwners() {
 }
 
 // ============================================================================
-// NEW: /for-roster-managers landing page
+// /for-roster-managers landing page
 // ============================================================================
 function ForRosterManagers() {
   const { openAuthAs } = useApp();
@@ -2244,9 +2159,8 @@ function ForRosterManagers() {
     </div>
   );
 }
-
 // ============================================================================
-// NEW: Header + Nav, now using <Link> instead of state-based view switching
+// Header + Nav (Link-based routing)
 // ============================================================================
 function Header() {
   const { user, liveCount, pulse, handleSignOut, setShowAuth } = useApp();
@@ -2254,6 +2168,7 @@ function Header() {
   return (
     <header style={{ background:"rgba(14,15,19,0.95)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${T.border}`,padding:"0 28px",height:60,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100 }}>
       <Link to="/" style={{ display:"flex",alignItems:"center",gap:10,textDecoration:"none" }}>
+        <img src="/symbol.svg" alt="ScriptShift" width={30} height={30} style={{ display:"block" }} />
         <span style={{ fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,color:T.white }}>Script<span style={{color:T.amber}}>Shift</span></span>
         <span style={{ fontSize:11,fontWeight:600,color:T.dim,borderLeft:`1px solid ${T.border}`,paddingLeft:10,letterSpacing:1 }}>WESTERN AUSTRALIA</span>
       </Link>
@@ -2263,11 +2178,9 @@ function Header() {
       </div>
       {user ? (
         <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-          <span 
-        onClick={()=>navigate("/profile")} 
-        style={{ fontSize:13,color:T.amber,cursor:"pointer",fontWeight:600 }}>
-👋 {user.user_metadata?.full_name?.split(" ")[0]||"Profile"}
-</span>
+          <span onClick={()=>navigate("/profile")} style={{ fontSize:13,color:T.amber,cursor:"pointer",fontWeight:600 }}>
+            👋 {user.user_metadata?.full_name?.split(" ")[0]||"Profile"}
+          </span>
           <button onClick={handleSignOut} style={{ background:"transparent",border:`1px solid ${T.border}`,color:T.dim,borderRadius:7,padding:"7px 14px",fontSize:12,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>Sign Out</button>
         </div>
       ) : (
@@ -2291,7 +2204,6 @@ function NavBar() {
     { path:"/profile", l: user ? (user.user_metadata?.full_name?.split(" ")[0]||"Profile") : "Sign In" },
   ];
 
-  // Only show the app nav once inside the app itself (not on marketing pages)
   const isAppRoute = ["/browse","/post","/applications","/profile"].includes(location.pathname);
   if (!isAppRoute) return null;
 
@@ -2310,7 +2222,6 @@ function NavBar() {
 
 function Footer() {
   const { setShowAuth, setLegalDoc } = useApp();
-  const navigate = useNavigate();
   return (
     <footer style={{ background:T.bgCard,borderTop:`1px solid ${T.border}`,padding:"32px 28px",marginTop:40 }}>
       <div style={{ maxWidth:980,margin:"0 auto" }}>
@@ -2365,10 +2276,10 @@ function Footer() {
 }
 
 // ============================================================================
-// NEW: Browse view as a route (uses your unchanged ShiftCard component)
+// Browse view as a route
 // ============================================================================
 function BrowseRoute() {
-  const { shifts, applied, handleApply, user, token, liveCount, loadShifts } = useApp();
+  const { shifts, applied, handleApply, user, token, liveCount, loadShifts, setShowAuth } = useApp();
   const [regionFilter, setReg] = useState("All");
   const [typeFilter, setType] = useState("All");
   const navigate = useNavigate();
@@ -2383,19 +2294,12 @@ function BrowseRoute() {
     return true;
   });
 
-  const { setShowAuth } = useApp();
-
   const markFilled = async (shiftId) => {
     if (!window.confirm("Mark this shift as filled? It will be removed from the live board and no further applications will be accepted.")) return;
     try {
       await fetch(SUPA_URL + "/rest/v1/shifts?id=eq." + shiftId, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": SUPA_KEY,
-          "Authorization": "Bearer " + (token || SUPA_KEY),
-          "Prefer": "return=minimal"
-        },
+        headers: { "Content-Type": "application/json", "apikey": SUPA_KEY, "Authorization": "Bearer " + (token || SUPA_KEY), "Prefer": "return=minimal" },
         body: JSON.stringify({ status: "filled" })
       });
       loadShifts();
@@ -2407,20 +2311,12 @@ function BrowseRoute() {
     try {
       await fetch(SUPA_URL + "/rest/v1/shifts?id=eq." + shiftId, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": SUPA_KEY,
-          "Authorization": "Bearer " + (token || SUPA_KEY),
-          "Prefer": "return=minimal"
-        },
+        headers: { "Content-Type": "application/json", "apikey": SUPA_KEY, "Authorization": "Bearer " + (token || SUPA_KEY), "Prefer": "return=minimal" },
         body: JSON.stringify({ status: "withdrawn" })
       });
       await fetch(SUPA_URL + "/rest/v1/applications?shift_id=eq." + shiftId, {
         method: "DELETE",
-        headers: {
-          "apikey": SUPA_KEY,
-          "Authorization": "Bearer " + (token || SUPA_KEY),
-        }
+        headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + (token || SUPA_KEY) }
       });
       loadShifts();
     } catch(e) { console.warn(e); }
@@ -2450,7 +2346,7 @@ function BrowseRoute() {
         <span style={{ fontSize:12,color:T.dimmer,marginRight:4,fontWeight:600,letterSpacing:0.5 }}>REGION</span>
         {["All","Metro","Regional"].map(r=>(<button key={r} onClick={()=>setReg(r)} style={{ padding:"5px 14px",borderRadius:20,border:`1px solid ${regionFilter===r?T.amber:T.border}`,background:regionFilter===r?T.amberDim:"transparent",color:regionFilter===r?T.amberText:T.dim,fontSize:12,fontWeight:regionFilter===r?700:400,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>{r}</button>))}
         <span style={{ fontSize:12,color:T.dimmer,marginLeft:12,marginRight:4,fontWeight:600,letterSpacing:0.5 }}>TYPE</span>
-        {["All","Emergency","Standard","Weekend","Evening"].map(t=>(<button key={t} onClick={()=>setType(t)} style={{ padding:"5px 14px",borderRadius:20,border:`1px solid ${typeFilter===t?T.amber:T.border}`,background:typeFilter===t?T.amberDim:"transparent",color:typeFilter===t?T.amberText:T.dim,fontSize:12,fontWeight:typeFilter===t?700:400,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>{t}</button>))}
+        {["All","Emergency","Standard","Weekend"].map(t=>(<button key={t} onClick={()=>setType(t)} style={{ padding:"5px 14px",borderRadius:20,border:`1px solid ${typeFilter===t?T.amber:T.border}`,background:typeFilter===t?T.amberDim:"transparent",color:typeFilter===t?T.amberText:T.dim,fontSize:12,fontWeight:typeFilter===t?700:400,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>{t}</button>))}
       </div>
 
       <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:14 }}>
@@ -2501,9 +2397,7 @@ function PostRoute() {
   );
 }
 
-// Marketing home — choose your own copy here, or redirect straight to /browse
 function Home() {
-  const navigate = useNavigate();
   const s = {
     page:{ maxWidth:960,margin:"0 auto",padding:"80px 24px",textAlign:"center" },
     h1:{ fontFamily:"'Playfair Display',serif",fontSize:"2.5rem",fontWeight:900,marginBottom:10 },
@@ -2514,11 +2408,11 @@ function Home() {
   };
   return (
     <div style={s.page}>
-    <Helmet>
-      <title>ScriptShift WA | Locum Pharmacist Shifts in Western Australia</title>
-      <meta name="description" content="ScriptShift WA connects AHPRA-registered pharmacists with pharmacy owners across Western Australia." />
-      <link rel="canonical" href="https://www.scriptshiftwa.com.au/" />
-    </Helmet>
+      <Helmet>
+        <title>ScriptShift WA | Locum Pharmacist Shifts in Western Australia</title>
+        <meta name="description" content="ScriptShift WA connects AHPRA-registered pharmacists with pharmacy owners across Western Australia." />
+        <link rel="canonical" href="https://www.scriptshiftwa.com.au/" />
+      </Helmet>
       <h1 style={s.h1}>Script<span style={{color:T.amber}}>Shift</span> Western Australia</h1>
       <p style={s.sub}>The real-time pharmacy shift marketplace connecting AHPRA-registered locum pharmacists with pharmacy owners across WA.</p>
       <div style={s.group}>
@@ -2531,7 +2425,7 @@ function Home() {
 }
 
 // ============================================================================
-// NEW: AppShell — renders header/nav/footer + modals + routed content
+// AppShell + default export
 // ============================================================================
 function AppShell() {
   const {
@@ -2595,9 +2489,6 @@ function AppShell() {
   );
 }
 
-// ============================================================================
-// NEW default export — wraps everything in BrowserRouter + AppProvider
-// ============================================================================
 export default function App() {
   return (
     <HelmetProvider>
