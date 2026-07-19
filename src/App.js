@@ -2166,13 +2166,13 @@ function Header() {
   const { user, liveCount, pulse, handleSignOut, setShowAuth } = useApp();
   const navigate = useNavigate();
   return (
-    <header style={{ background:"rgba(14,15,19,0.95)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${T.border}`,padding:"0 28px",height:60,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100 }}>
-      <Link to="/" style={{ display:"flex",alignItems:"center",gap:10,textDecoration:"none" }}>
-        <img src="/symbol.svg" alt="ScriptShift" width={30} height={30} style={{ display:"block" }} />
-        <span style={{ fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,color:T.white }}>Script<span style={{color:T.amber}}>Shift</span></span>
-        <span style={{ fontSize:11,fontWeight:600,color:T.dim,borderLeft:`1px solid ${T.border}`,paddingLeft:10,letterSpacing:1 }}>WESTERN AUSTRALIA</span>
+    <header className="ss-header" style={{ background:"rgba(14,15,19,0.95)",backdropFilter:"blur(12px)",borderBottom:`1px solid ${T.border}`,padding:"0 28px",height:60,display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100 }}>
+      <Link to="/" style={{ display:"flex",alignItems:"center",gap:10,textDecoration:"none",minWidth:0 }}>
+        <img src="/symbol.svg" alt="ScriptShift" width={30} height={30} style={{ display:"block",flexShrink:0 }} />
+        <span style={{ fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:900,color:T.white,whiteSpace:"nowrap" }}>Script<span style={{color:T.amber}}>Shift</span></span>
+        <span className="ss-header-tag" style={{ fontSize:11,fontWeight:600,color:T.dim,borderLeft:`1px solid ${T.border}`,paddingLeft:10,letterSpacing:1 }}>WESTERN AUSTRALIA</span>
       </Link>
-      <div style={{ display:"flex",alignItems:"center",gap:7,background:pulse?"rgba(240,165,0,0.1)":T.bgCard,border:`1px solid ${pulse?T.amber:T.border}`,borderRadius:20,padding:"5px 14px",transition:"all 0.3s",fontSize:12,fontWeight:600,color:pulse?T.amber:T.dim }}>
+      <div className="ss-header-live" style={{ display:"flex",alignItems:"center",gap:7,background:pulse?"rgba(240,165,0,0.1)":T.bgCard,border:`1px solid ${pulse?T.amber:T.border}`,borderRadius:20,padding:"5px 14px",transition:"all 0.3s",fontSize:12,fontWeight:600,color:pulse?T.amber:T.dim }}>
         <span style={{ width:7,height:7,borderRadius:"50%",background:pulse?T.amber:T.mint,animation:"blink 1.6s infinite",display:"block" }}/>
         {liveCount} live
       </div>
@@ -2443,6 +2443,11 @@ function AppShell() {
         ::-webkit-scrollbar{width:6px} ::-webkit-scrollbar-track{background:${T.bg}} ::-webkit-scrollbar-thumb{background:${T.border};border-radius:3px}
         input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-calendar-picker-indicator{filter:invert(0.5)}
         select option{background:${T.bgCard};color:${T.white}}
+        @media (max-width: 560px) {
+          .ss-header { padding:0 14px !important; }
+          .ss-header-tag { display:none !important; }
+          .ss-header-live { display:none !important; }
+        }
       `}</style>
 
       <Header />
