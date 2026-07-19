@@ -4,13 +4,11 @@
 //   - api/stripe-webhook.js  after a paid shift is inserted
 //   - src/App.js             after a free shift is inserted
 //
-// Safe to call from the browser: it accepts only a shiftId, re-reads the shift
-// server-side with the service role key, and refuses to notify the same shift twice.
+// Accepts only a shiftId, re-reads the shift server-side with the service role
+// key, and refuses to notify the same shift twice.
 //
-// REQUIRED DB CHANGE — run once in the Supabase SQL editor:
+// REQUIRED DB CHANGE (already run):
 //   alter table shifts add column if not exists notified_at timestamptz;
-
-import { sendPushToAll } from "../lib/apns.js";
 
 const SUPA_URL = process.env.SUPABASE_URL;
 const SUPA_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -24,7 +22,6 @@ const supaHeaders = {
   Authorization: `Bearer ${SUPA_SERVICE_KEY}`,
 };
 
-// Build one email payload for a pharmacist (used by the batch sender below).
 function buildEmail(pharmacist, shift) {
   const { email, full_name } = pharmacist;
   const shiftDate = shift.shift_date || "TBC";
@@ -63,30 +60,38 @@ function buildEmail(pharmacist, shift) {
   };
 }
 
-// Resend's batch endpoint takes up to 100 emails in ONE request, which avoids
-// the 2-requests-per-second rate limit that silently dropped sends before.
+// Resend batch endpoint: up to 100 emails per request.
+// Returns { ok, count, error } so the caller knows whether it actually sent.
 async function sendBatch(emails) {
-  const res = await fetch("https://api.resend.com/emails/batch", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${RESEND_API_KEY}`,
-    },
-    body: JSON.stringify(emails),
-  });
-
-  const text = await res.text();
-  if (!res.ok) {
-    console.error(`Resend batch failed (${res.status}):`, text);
-    return 0;
+  try {
+    const res = await fetch("https://api.resend.com/emails/batch", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify(emails),
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      console.error(`Resend batch failed (${res.status}): ${text}`);
+      return { ok: false, count: 0, error: `${res.status}: ${text}` };
+    }
+    console.log(`Resend batch accepted ${emails.length} emails: ${text}`);
+    return { ok: true, count: emails.length, error: null };
+  } catch (e) {
+    console.error("Resend batch threw:", e.message);
+    return { ok: false, count: 0, error: e.message };
   }
-  console.log(`Resend batch accepted ${emails.length} emails`);
-  return emails.length;
 }
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  if (!RESEND_API_KEY) {
+    console.error("notify-shift: RESEND_API_KEY is not set!");
   }
 
   let body = req.body;
@@ -96,7 +101,7 @@ export default async function handler(req, res) {
   const shiftId = body?.shiftId;
   if (!shiftId) return res.status(400).json({ error: "shiftId required" });
 
-  // 1. Re-read the shift server-side (never trust the caller's copy)
+  // 1. Re-read the shift server-side
   let shift = null;
   try {
     const shiftRes = await fetch(
@@ -119,16 +124,9 @@ export default async function handler(req, res) {
     return res.status(200).json({ skipped: "already notified" });
   }
 
-  // 2. Claim it immediately so a double-call can't double-send
-  await fetch(`${SUPA_URL}/rest/v1/shifts?id=eq.${shiftId}`, {
-    method: "PATCH",
-    headers: supaHeaders,
-    body: JSON.stringify({ notified_at: new Date().toISOString() }),
-  });
-
-  // 3. Fetch matching pharmacists and email them
+  // 2. Fetch matching pharmacists
   let matchedCount = 0;
-  let emailed = 0;
+  let emailResult = { ok: false, count: 0, error: "not attempted" };
   try {
     const profilesRes = await fetch(
       `${SUPA_URL}/rest/v1/profiles?role=eq.pharmacist&select=email,full_name,software,regions`,
@@ -146,34 +144,52 @@ export default async function handler(req, res) {
         const pRegions = Array.isArray(p.regions)
           ? p.regions.join(",").toLowerCase()
           : (p.regions || "").toLowerCase();
-
-        // Match if pharmacist knows the required software OR shift has no software requirement
         const softwareMatch = !shiftSoftware || pSoftware.includes(shiftSoftware) || shiftSoftware.includes("any");
-        // Match if pharmacist covers the region OR pharmacist has no region set
         const regionMatch = !pRegions || pRegions.includes(shiftRegion) || pRegions.includes("western australia");
-
         return softwareMatch && regionMatch;
       });
 
       matchedCount = matching.length;
-      console.log(`notify-shift: sending to ${matching.length}/${pharmacists.length} pharmacists for shift ${shiftId}`);
+      console.log(`notify-shift: matched ${matching.length}/${pharmacists.length} pharmacists for shift ${shiftId}`);
 
-      // Send via Resend's batch endpoint: 100 per request, so one request
-      // covers the whole list and we never hit the per-second rate limit.
-      const payloads = matching.map(p => buildEmail(p, shift));
-      for (let i = 0; i < payloads.length; i += 100) {
-        const batch = payloads.slice(i, i + 100);
-        emailed += await sendBatch(batch);
-        if (i + 100 < payloads.length) await new Promise(r => setTimeout(r, 600));
+      if (matching.length > 0) {
+        const payloads = matching.map(p => buildEmail(p, shift));
+        let totalSent = 0;
+        let anyFailed = false;
+        let lastError = null;
+        for (let i = 0; i < payloads.length; i += 100) {
+          const batch = payloads.slice(i, i + 100);
+          const r = await sendBatch(batch);
+          if (r.ok) totalSent += r.count;
+          else { anyFailed = true; lastError = r.error; }
+          if (i + 100 < payloads.length) await new Promise(r => setTimeout(r, 600));
+        }
+        emailResult = { ok: !anyFailed, count: totalSent, error: lastError };
+      } else {
+        emailResult = { ok: true, count: 0, error: null }; // nothing to send is "success"
       }
     }
   } catch (e) {
-    console.warn("notify-shift: email stage failed —", e.message);
+    console.error("notify-shift: email stage failed —", e.message);
+    emailResult = { ok: false, count: 0, error: e.message };
   }
 
-  // 4. Native push to registered iOS devices
+  // 3. Claim the shift ONLY if the email stage succeeded. A failure leaves
+  //    notified_at null so a later call can retry instead of silently burning it.
+  if (emailResult.ok) {
+    await fetch(`${SUPA_URL}/rest/v1/shifts?id=eq.${shiftId}`, {
+      method: "PATCH",
+      headers: supaHeaders,
+      body: JSON.stringify({ notified_at: new Date().toISOString() }),
+    });
+  } else {
+    console.error(`notify-shift: NOT claiming shift ${shiftId} — email failed: ${emailResult.error}`);
+  }
+
+  // 4. Native push (isolated: a push failure must never affect email or claim)
   let push = { sent: 0, failed: 0 };
   try {
+    const { sendPushToAll } = await import("../lib/apns.js");
     push = await sendPushToAll({
       title: "New shift posted",
       body: `${shift.pharmacy_name || "A WA pharmacy"} — ${shift.shift_date || "new shift"}${shift.location ? " · " + shift.location : ""}`,
@@ -183,5 +199,11 @@ export default async function handler(req, res) {
     console.error("notify-shift: push stage failed —", e.message);
   }
 
-  return res.status(200).json({ ok: true, matched: matchedCount, emailed, push });
+  return res.status(200).json({
+    ok: emailResult.ok,
+    matched: matchedCount,
+    emailed: emailResult.count,
+    emailError: emailResult.error,
+    push,
+  });
 }
