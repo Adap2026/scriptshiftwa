@@ -14,7 +14,7 @@ import { sendPushToAll } from "../lib/apns.js";
 
 const SUPA_URL = process.env.SUPABASE_URL;
 const SUPA_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const RESEND_API_KEY = process.env.ScriptShift_Webhook;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 export const maxDuration = 60;
 
