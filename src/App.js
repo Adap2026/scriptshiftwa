@@ -2198,7 +2198,7 @@ function NavBar() {
   const NAV = [
     { path:"/browse", l:"Browse Shifts" },
     { path:"/post", l:"Post a Shift" },
-    { path:"/applications", l:`Applications${applied.size ? ` (${[...applied].filter(id => shifts.some(s => s.id === id && s.status === "active")).length || ""})` : ""}` },
+   { path:"/applications", l:`Applications${applied.size ? ` (${[...applied].filter(id => shifts.some(s => s.id === id && isLiveShift(s))).length || ""})` : ""}` },
     { path:"/profile", l: user ? (user.user_metadata?.full_name?.split(" ")[0]||"Profile") : "Sign In" },
   ];
 
