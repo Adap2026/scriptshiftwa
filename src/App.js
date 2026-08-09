@@ -1514,16 +1514,7 @@ function OwnerApplicationsDashboard({ user, token, shifts }) {
   const [loading, setLoading] = useState(true);
 
   const myShifts = shifts.filter(s => s.owner_id === user.id);
-  const myActiveShiftIds = new Set(
-    myShifts
-      .filter(s => {
-        if (s.status !== "active") return false;
-        const endDate = new Date((s.date_to || s.shift_date) + "T00:00:00");
-        const tod = new Date(); tod.setHours(0,0,0,0);
-        return endDate >= tod;
-      })
-      .map(s => s.id)
-  );
+  const myActiveShiftIds = new Set(myShifts.filter(isLiveShift).map(s => s.id));
 
   useEffect(()=>{
     if (myShifts.length === 0) { setLoading(false); return; }
@@ -1788,7 +1779,7 @@ function AppProvider({ children }) {
         { headers: { "apikey": SUPA_KEY, "Authorization": "Bearer " + sessionToken, "Range": "0-499" } }
       );
       const data = await res.json();
-      if (Array.isArray(data)) { setShifts(data); setLiveCount(data.filter(s=>s.status==="active").length); }
+      if (Array.isArray(data)) { setShifts(data); setLiveCount(data.filter(isLiveShift).length); }
     } catch(e) { console.warn("Shifts fetch error:", e); }
   };
 
@@ -2291,15 +2282,12 @@ function BrowseRoute() {
   const [typeFilter, setType] = useState("All");
   const navigate = useNavigate();
 
-  const today = new Date(); today.setHours(0,0,0,0);
   const filtered = shifts.filter(s=>{
-    if(s.status !== "active") return false;
-    const endDate = new Date((s.date_to || s.shift_date) + "T00:00:00");
-    if(endDate < today) return false;
-    if(regionFilter!=="All"&&s.region!==regionFilter) return false;
-    if(typeFilter!=="All"&&s.type!==typeFilter) return false;
-    return true;
-  });
+  if (!isLiveShift(s)) return false;
+  if(regionFilter!=="All"&&s.region!==regionFilter) return false;
+  if(typeFilter!=="All"&&s.type!==typeFilter) return false;
+  return true;
+});
 
   const markFilled = async (shiftId) => {
     if (!window.confirm("Mark this shift as filled? It will be removed from the live board and no further applications will be accepted.")) return;
