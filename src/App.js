@@ -57,6 +57,13 @@ const getListingTotal = (days, type) => {
   return rate * Math.max(0, days);
 };
 
+const isLiveShift = (s) => {
+  if (s.status !== "active") return false;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const endDate = new Date((s.date_to || s.shift_date) + "T00:00:00");
+  return endDate >= today;
+};
+
 const fmtAud = (n) => `$${n} AUD`;
 
 // Detect shift type from the start date — weekend, or emergency if within 2 days.
