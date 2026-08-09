@@ -1,0 +1,69 @@
+// api/auto-fill-shifts.js
+//
+// Runs on a schedule (see vercel.json). Finds shifts that:
+//   - are still status = 'active'
+//   - have at least one application with status = 'accepted'
+//   - whose end date (date_to || shift_date) has passed
+// ...and flips them to status = 'filled'.
+//
+// Shifts that expired with NO accepted application are left alone —
+// isLiveShift() already hides them from the live board/count, and
+// "filled" implies someone was actually confirmed. If you later want
+// truly stale unfilled listings to auto-expire too, that's a separate
+// status transition (e.g. 'expired') and a second query below.
+
+const { createClient } = require('@supabase/supabase-js');
+
+const SUPA_URL = process.env.SUPA_URL || 'https://ageszwwbtawphfmtmrfj.supabase.co';
+const supabase = createClient(SUPA_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+module.exports = async (req, res) => {
+  // Optional: guard against public triggering if you're not using
+  // Vercel Cron's built-in auth. Uncomment if you set CRON_SECRET.
+  // if (req.headers['authorization'] !== `Bearer ${process.env.CRON_SECRET}`) {
+  //   return res.status(401).send('Unauthorized');
+  // }
+
+  const todayISO = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD", UTC date is fine here — see note below
+
+  try {
+    // 1. Find active shifts with an accepted application, whose end date has passed.
+    //    PostgREST can't easily express "date_to OR shift_date < today" server-side
+    //    with a coalesce in a filter, so pull active+accepted candidates and filter
+    //    the date comparison in JS (shift volumes here are small).
+    const { data: candidates, error: fetchErr } = await supabase
+      .from('shifts')
+      .select('id, shift_date, date_to, applications!inner(status)')
+      .eq('status', 'active')
+      .eq('applications.status', 'accepted');
+
+    if (fetchErr) {
+      console.warn('auto-fill-shifts fetch error:', fetchErr);
+      return res.status(500).json({ error: 'Fetch failed' });
+    }
+
+    const expiredIds = (candidates || [])
+      .filter((s) => (s.date_to || s.shift_date) < todayISO)
+      .map((s) => s.id);
+
+    if (expiredIds.length === 0) {
+      return res.status(200).json({ ok: true, updated: 0 });
+    }
+
+    const { error: updateErr } = await supabase
+      .from('shifts')
+      .update({ status: 'filled' })
+      .in('id', expiredIds);
+
+    if (updateErr) {
+      console.warn('auto-fill-shifts update error:', updateErr);
+      return res.status(500).json({ error: 'Update failed' });
+    }
+
+    console.log(`auto-fill-shifts: marked ${expiredIds.length} shift(s) filled`, expiredIds);
+    return res.status(200).json({ ok: true, updated: expiredIds.length, ids: expiredIds });
+  } catch (e) {
+    console.warn('auto-fill-shifts error:', e);
+    return res.status(500).json({ error: 'Unexpected error' });
+  }
+};
