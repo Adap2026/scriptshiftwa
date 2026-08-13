@@ -4,23 +4,31 @@
 // pharmacist and the pharmacy owner an email with a link to subscribe
 // to their ScriptShift calendar feed.
 //
-// NOTE: no .ics attachment here — Resend's batch send endpoint does not
-// support attachments (only single sends do), and this fires two emails
-// per acceptance, so it stays on batch rather than switching to two
-// individual sends. The webcal:// / "Add to Google Calendar" links do
-// the same job and, unlike a one-off .ics, stay in sync automatically
-// if the shift is later withdrawn.
+// NOTES:
+// - No .ics attachment: Resend's batch endpoint doesn't support attachments.
+// - No `resend` npm package: it isn't in package.json, so this calls
+//   Resend's HTTP API directly with fetch — same approach notify-shift.js
+//   already uses for its batch sends.
+// - Uses whichever Resend key env var is set. Your Resend key has
+//   historically been stored under the non-standard name
+//   ScriptShift_Webhook alongside RESEND_API_KEY — this checks both so it
+//   works regardless of which one is actually populated.
 
 const { createClient } = require('@supabase/supabase-js');
-const { Resend } = require('resend');
 
 const SUPA_URL = process.env.SUPA_URL || 'https://ageszwwbtawphfmtmrfj.supabase.co';
 const supabase = createClient(SUPA_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-const resend = new Resend(process.env.ScriptShift_Webhook); // existing Resend key env var
+
+const RESEND_API_KEY = process.env.ScriptShift_Webhook || process.env.RESEND_API_KEY;
 
 module.exports = async (req, res) => {
   const { applicationId } = req.body;
   if (!applicationId) return res.status(400).json({ error: 'Missing applicationId' });
+
+  if (!RESEND_API_KEY) {
+    console.warn('notify-acceptance: no Resend API key found in env (checked ScriptShift_Webhook, RESEND_API_KEY)');
+    return res.status(500).json({ error: 'Email service not configured' });
+  }
 
   const { data: app, error: appErr } = await supabase
     .from('applications')
@@ -53,7 +61,7 @@ module.exports = async (req, res) => {
 
   const feedUrl = (token) => `https://www.scriptshiftwa.com.au/api/calendar-feed?token=${token}`;
 
-  await resend.batch.send([
+  const emails = [
     {
       from: 'ScriptShift WA <shifts@scriptshiftwa.com.au>',
       to: pharmacist.email,
@@ -72,7 +80,27 @@ module.exports = async (req, res) => {
         <p><a href="${feedUrl(ownerToken)}">Subscribe to your pharmacy's roster calendar</a> to keep a running schedule of every accepted shift.</p>
       `,
     },
-  ]);
+  ];
+
+  try {
+    const resendRes = await fetch('https://api.resend.com/emails/batch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify(emails),
+    });
+
+    if (!resendRes.ok) {
+      const errText = await resendRes.text();
+      console.warn('notify-acceptance: Resend send failed:', resendRes.status, errText);
+      return res.status(502).json({ error: 'Email send failed' });
+    }
+  } catch (e) {
+    console.warn('notify-acceptance: Resend request error:', e);
+    return res.status(502).json({ error: 'Email send failed' });
+  }
 
   res.status(200).json({ ok: true });
 };
