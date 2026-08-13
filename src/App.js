@@ -1320,10 +1320,19 @@ function OwnerShiftApplications({ shiftId, token }) {
         "Authorization": "Bearer " + (token || SUPA_KEY),
         "Prefer": "return=minimal"
       },
-      body: JSON.stringify({ status: newStatus })
+     body: JSON.stringify({ status: newStatus })
     });
-    setApps(prev => prev.map(a => a.id === appId ? {...a, status: newStatus} : a));
-  };
+    setApps(prev => prev.map(a => a.id === appId ? Object.assign({}, a, {status: newStatus}) : a));
+
+    if (newStatus === "accepted") {
+      fetch("/api/notify-acceptance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId: appId }),
+      }).catch(e => console.warn("notify-acceptance failed:", e));
+    }
+  } catch(e) { console.warn(e); }
+};
 
   if (loading) return React.createElement("div", { style:{color:T.dim,fontSize:13,padding:"8px 0"} }, "Loading applications...");
   if (apps.length === 0) return React.createElement("div", { style:{color:T.dim,fontSize:13,fontStyle:"italic"} }, "No applications yet.");
