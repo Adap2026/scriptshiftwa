@@ -10,6 +10,7 @@ import {
 } from "react-router-dom";
 import { HelmetProvider, Helmet } from "react-helmet-async";
 import BlogLocumGuide from "./pages/BlogLocumGuide";
+import CalendarSubscribe from "./CalendarSubscribe";
 
 // ── Fonts ─────────────────────────────────────────────────────────────────────
 const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Outfit:wght@300;400;500;600;700&display=swap');`;
@@ -1057,6 +1058,7 @@ function ProfileView({ user, token, onSignOut }) {
               <div style={{ fontSize:12,fontWeight:700,color:T.amber,marginBottom:4,letterSpacing:0.5 }}>🔔 REAL-TIME ALERTS ACTIVE</div>
               <div style={{ fontSize:13,color:T.dim,lineHeight:1.6 }}>You'll be notified when new shifts match your location and software preferences.</div>
             </div>
+            <CalendarSubscribe user={user} />
             <DeleteAccountSection token={token} onDeleted={onSignOut} />
             <button onClick={onSignOut} style={{ width:"100%",padding:"10px 0",borderRadius:8,border:`1px solid ${T.border}`,background:"transparent",color:T.dim,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Outfit',sans-serif" }}>
               Sign Out
