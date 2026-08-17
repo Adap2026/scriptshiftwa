@@ -1314,28 +1314,29 @@ function OwnerShiftApplications({ shiftId, token }) {
   }, [shiftId, token]);
 
   const updateStatus = async (appId, newStatus) => {
-    await fetch(SUPA_URL + "/rest/v1/applications?id=eq." + appId, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": SUPA_KEY,
-        "Authorization": "Bearer " + (token || SUPA_KEY),
-        "Prefer": "return=minimal"
-      },
-     body: JSON.stringify({ status: newStatus })
-    });
-    setApps(prev => prev.map(a => a.id === appId ? Object.assign({}, a, {status: newStatus}) : a));
+    try {
+      await fetch(SUPA_URL + "/rest/v1/applications?id=eq." + appId, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPA_KEY,
+          "Authorization": "Bearer " + (token || SUPA_KEY),
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      setApps(prev => prev.map(a => a.id === appId ? Object.assign({}, a, {status: newStatus}) : a));
 
-    if (newStatus === "accepted") {
-      fetch("/api/notify-acceptance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ applicationId: appId }),
-      }).catch(e => console.warn("notify-acceptance failed:", e));
-    }
-  } catch(e) { console.warn(e); }
-};
-
+      if (newStatus === "accepted") {
+        fetch("/api/notify-acceptance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ applicationId: appId }),
+        }).catch(e => console.warn("notify-acceptance failed:", e));
+      }
+    } catch(e) { console.warn(e); }
+  };
+  
   if (loading) return React.createElement("div", { style:{color:T.dim,fontSize:13,padding:"8px 0"} }, "Loading applications...");
   if (apps.length === 0) return React.createElement("div", { style:{color:T.dim,fontSize:13,fontStyle:"italic"} }, "No applications yet.");
 
