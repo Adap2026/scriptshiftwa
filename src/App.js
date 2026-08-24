@@ -1867,7 +1867,7 @@ function AppProvider({ children }) {
 
   const handleApply = (shift) => { if (!user) { setShowAuth(true); return; } setTarget(shift); };
 
-  const confirmApply = async (msg) => {
+ const confirmApply = async (msg) => {
     const shiftId = applyTarget.id;
     const userId = user?.id;
     if (!userId) return;
@@ -1877,7 +1877,7 @@ function AppProvider({ children }) {
         headers: {
           "Content-Type": "application/json",
           "apikey": SUPA_KEY,
-          "Authorization": "Bearer " + SUPA_KEY,
+          "Authorization": "Bearer " + token,
           "Prefer": "return=representation"
         },
         body: JSON.stringify({ shift_id: shiftId, pharmacist_id: userId, message: msg || "", status: "pending" })
@@ -1891,7 +1891,7 @@ function AppProvider({ children }) {
       } catch(e) {}
       await fetch(SUPA_URL + "/rest/v1/rpc/increment_applicant_count", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": SUPA_KEY, "Authorization": "Bearer " + SUPA_KEY },
+        headers: { "Content-Type": "application/json", "apikey": SUPA_KEY, "Authorization": "Bearer " + token },
         body: JSON.stringify({ shift_id_input: shiftId })
       });
     } catch(e) { console.warn("Apply error:", e); }
@@ -1900,7 +1900,7 @@ function AppProvider({ children }) {
     loadShifts();
     showToast("Application sent — the pharmacy owner has been notified.");
   };
-
+  
   const value = {
     applied, toast, liveCount, pulse, showAuth, setShowAuth,
     user, token, shifts, confirmedEmail, setConfirmedEmail,
