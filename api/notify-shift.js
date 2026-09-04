@@ -124,6 +124,33 @@ export default async function handler(req, res) {
     return res.status(200).json({ skipped: "already notified" });
   }
 
+  // 1b. Atomically claim the shift BEFORE sending. The filter
+  //     `notified_at=is.null` means this PATCH only succeeds for whichever
+  //     concurrent caller gets there first — Supabase returns the updated
+  //     row(s) only when the filter matched, so an empty result tells us we
+  //     lost the race and must not send. This closes the gap where two
+  //     invocations (e.g. a Stripe webhook retry racing the original call)
+  //     could both read notified_at: null and both email every pharmacist.
+  let claimed;
+  try {
+    const claimRes = await fetch(
+      `${SUPA_URL}/rest/v1/shifts?id=eq.${shiftId}&notified_at=is.null`,
+      {
+        method: "PATCH",
+        headers: { ...supaHeaders, Prefer: "return=representation" },
+        body: JSON.stringify({ notified_at: new Date().toISOString() }),
+      }
+    );
+    if (!claimRes.ok) throw new Error(await claimRes.text());
+    claimed = await claimRes.json();
+  } catch (e) {
+    console.error("notify-shift: claim step failed —", e.message);
+    return res.status(500).json({ error: "Could not claim shift" });
+  }
+  if (!Array.isArray(claimed) || claimed.length === 0) {
+    return res.status(200).json({ skipped: "already notified (lost claim race)" });
+  }
+
   // 2. Fetch matching pharmacists
   let matchedCount = 0;
   let emailResult = { ok: false, count: 0, error: "not attempted" };
@@ -144,8 +171,11 @@ export default async function handler(req, res) {
         const pRegions = Array.isArray(p.regions)
           ? p.regions.join(",").toLowerCase()
           : (p.regions || "").toLowerCase();
-        const softwareMatch = !shiftSoftware || pSoftware.includes(shiftSoftware) || shiftSoftware.includes("any");
-        const regionMatch = !pRegions || pRegions.includes(shiftRegion) || pRegions.includes("western australia");
+        const softwareMatch = !shiftSoftware || shiftSoftware.includes("any") || pSoftware.includes("any") || pSoftware.includes(shiftSoftware);
+        // Guard shiftRegion here too: pRegions.includes("") is always true in JS,
+        // so an unset shift.region must fall back to "match everyone" explicitly
+        // rather than doing so silently via an empty-string .includes().
+        const regionMatch = !pRegions || !shiftRegion || pRegions.includes(shiftRegion) || pRegions.includes("western australia");
         return softwareMatch && regionMatch;
       });
 
@@ -174,16 +204,17 @@ export default async function handler(req, res) {
     emailResult = { ok: false, count: 0, error: e.message };
   }
 
-  // 3. Claim the shift ONLY if the email stage succeeded. A failure leaves
-  //    notified_at null so a later call can retry instead of silently burning it.
-  if (emailResult.ok) {
+  // 3. The shift was already claimed atomically in step 1b, before sending —
+  //    that's what prevents the concurrent double-send. If the email stage
+  //    failed, undo the claim so a later call can retry instead of the shift
+  //    being silently stuck as "notified" with nothing actually sent.
+  if (!emailResult.ok) {
+    console.error(`notify-shift: unclaiming shift ${shiftId} — email failed: ${emailResult.error}`);
     await fetch(`${SUPA_URL}/rest/v1/shifts?id=eq.${shiftId}`, {
       method: "PATCH",
       headers: supaHeaders,
-      body: JSON.stringify({ notified_at: new Date().toISOString() }),
+      body: JSON.stringify({ notified_at: null }),
     });
-  } else {
-    console.error(`notify-shift: NOT claiming shift ${shiftId} — email failed: ${emailResult.error}`);
   }
 
   // 4. Native push (isolated: a push failure must never affect email or claim)
